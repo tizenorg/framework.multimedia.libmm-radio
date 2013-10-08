@@ -37,6 +37,8 @@ CFLAGS=" %{optflags}  -DGST_EXT_TIME_ANALYSIS -DEXPORT_API=\"__attribute__((visi
 make %{?jobs:-j%jobs}
 
 %install
+mkdir -p %{buildroot}/usr/share/license
+cp LICENSE.APLv2 %{buildroot}/usr/share/license/%{name}
 %make_install
 
 
@@ -58,3 +60,4 @@ make %{?jobs:-j%jobs}
 %{_libdir}/libmmfradio.so
 %{_libdir}/pkgconfig/mm-radio.pc
 %{_includedir}/mmf/mm_radio.h
+/usr/share/license/%{name}
