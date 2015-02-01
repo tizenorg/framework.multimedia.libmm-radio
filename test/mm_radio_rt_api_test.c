@@ -23,7 +23,8 @@
 #include "mm_radio.h"
 #include "mm_radio_rt_api_test.h"
 
-#define MENU_ITEM_MAX	18
+#define MENU_ITEM_MAX	19
+#define _MAX_INPUT_STRING_ 100
 
 static int __menu(void);
 static void __call_api( int choosen );
@@ -40,7 +41,7 @@ void __call_api( int choosen )
 		case 1:
 		{
 			RADIO_TEST__( mm_radio_create( &g_my_radio ); )
-			RADIO_TEST__( mm_radio_set_message_callback( g_my_radio, __msg_rt_callback, &g_my_radio); )
+			RADIO_TEST__( mm_radio_set_message_callback( g_my_radio, __msg_rt_callback, g_my_radio); )
 		}
 		break;
 
@@ -153,7 +154,12 @@ void __call_api( int choosen )
 			printf("region band range: %d ~ %d KHz\n", min_freq, max_freq);
 		}
 		break;
-
+		case 19:
+		{
+			int signal_strength = 0;
+			RADIO_TEST__( mm_radio_get_signal_strength(g_my_radio, &signal_strength); )
+			printf("signal strength is : %d \n", signal_strength);
+		}
 		default:
 			break;
 	}
@@ -163,7 +169,6 @@ int mm_radio_rt_api_test(void)
 {
 	while(1)
 	{
-		char key = 0;
 		int choosen = 0;
 
 		choosen = __menu();
@@ -204,12 +209,21 @@ int __menu(void)
 	printf("[16] mm_radio_set_mute\n");
 	printf("[17] mm_radio_get_region_type\n");
 	printf("[18] mm_radio_get_region_frequency_range\n");
+	printf("[19] mm_radio_signal_strength\n");
 	printf("[0] quit\n");
 	printf("---------------------------------------------------------\n");
 	printf("choose one : ");
 	
 	if ( scanf("%d", &menu_item) == 0)
+	{
+		char temp[_MAX_INPUT_STRING_];
+                if (scanf("%s", temp) ==0)
+                {
+                        printf("Error while flushing the input buffer - but lets continue\n");
+                }
 		return -1;
+        }
+
 
 	if ( menu_item > MENU_ITEM_MAX )
 		menu_item = -1;
@@ -252,6 +266,13 @@ int __msg_rt_callback(int message, void *pParam, void *user_param)
 			break;
 	case MM_MESSAGE_RADIO_SEEK_FINISH:
 		printf("MM_MESSAGE_RADIO_SEEK_FINISHED : freq : %d\n", param->radio_scan.frequency);
+		break;
+	case MM_MESSAGE_STATE_INTERRUPTED:
+		printf("MM_MESSAGE_STATE_INTERRUPTED code - %d\n", param->code);
+		break;
+	case MM_MESSAGE_READY_TO_RESUME:
+		printf("MM_MESSAGE_READY_TO_RESUME\n");
+		RADIO_TEST__( mm_radio_start(radio); )
 		break;
 	default:
 		printf("ERROR : unknown message received!\n");

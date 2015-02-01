@@ -1,21 +1,22 @@
 Name:       libmm-radio
 Summary:    Multimedia Framework Radio Library
-Version:    0.2.1
+Version:    0.2.14
 Release:    0
 Group:      System/Libraries
-License:    Apache-2.0
+License:    Apache License, Version 2.0
 Source0:    %{name}-%{version}.tar.gz
+Requires(post): /sbin/ldconfig
+Requires(postun): /sbin/ldconfig
 BuildRequires:  audio-session-manager-devel
 BuildRequires:  pkgconfig(mm-common)
 BuildRequires:  pkgconfig(mm-log)
-BuildRequires:  pkgconfig(mm-ta)
 BuildRequires:  pkgconfig(mm-session)
 BuildRequires:  pkgconfig(mm-sound)
 BuildRequires:  pkgconfig(gstreamer-0.10)
 BuildRequires:  pkgconfig(gstreamer-plugins-base-0.10)
 
 %description
-Descirption: Multimedia Framework Radio Library
+Description: Multimedia Framework Radio Library
 
 
 %package devel
@@ -31,12 +32,19 @@ Description: Multimedia Framework Radio Library (DEV)
 
 %build
 ./autogen.sh
-CFLAGS=" %{optflags}  -DGST_EXT_TIME_ANALYSIS -DEXPORT_API=\"__attribute__((visibility(\\\"default\\\")))\" "; export CFLAGS;
-%configure --disable-static --prefix=%{_prefix}
+CFLAGS=" %{optflags} -Wall -DEXPORT_API=\"__attribute__((visibility(\\\"default\\\")))\" "; export CFLAGS;
+%configure \
+%ifarch i586
+--enable-emulator \
+%endif
+--disable-static --prefix=%{_prefix}
+
+
 
 make %{?jobs:-j%jobs}
 
 %install
+rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/share/license
 cp LICENSE.APLv2 %{buildroot}/usr/share/license/%{name}
 %make_install
@@ -52,7 +60,7 @@ cp LICENSE.APLv2 %{buildroot}/usr/share/license/%{name}
 %defattr(-,root,root,-)
 %{_libdir}/libmmfradio.so.*
 %{_bindir}/mm_radio_testsuite
-
+/usr/share/license/%{name}
 
 
 %files devel
@@ -60,4 +68,3 @@ cp LICENSE.APLv2 %{buildroot}/usr/share/license/%{name}
 %{_libdir}/libmmfradio.so
 %{_libdir}/pkgconfig/mm-radio.pc
 %{_includedir}/mmf/mm_radio.h
-/usr/share/license/%{name}

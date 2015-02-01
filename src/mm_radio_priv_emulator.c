@@ -38,6 +38,7 @@
 #include <mm_error.h>
 #include <mm_debug.h>
 #include <mm_message.h>
+#include <time.h>
 
 #include "mm_radio_priv.h"
 
@@ -59,7 +60,6 @@
 /*---------------------------------------------------------------------------
     LOCAL #defines:
 ---------------------------------------------------------------------------*/
-#define DEFAULT_DEVICE				"/dev/radio0"
 #define TUNER_INDEX				0
 
 #define DEFAULT_FREQ				107700
@@ -70,7 +70,7 @@
 #define DEFAULT_WRAP_AROUND 			1 //If non-zero, wrap around when at the end of the frequency range, else stop seeking
 
 #define RADIO_DEFAULT_REGION			MM_RADIO_REGION_GROUP_USA
-
+#define EMULATOR_FREQ_MAX 				5
 /*---------------------------------------------------------------------------
     LOCAL CONSTANT DEFINITIONS:
 ---------------------------------------------------------------------------*/
@@ -109,6 +109,11 @@ static const MMRadioRegion_t region_table[] =
 			MM_RADIO_FREQ_MAX_89900_KHZ,
 		},
 };
+
+static int MMRadioEmulatorFreq[EMULATOR_FREQ_MAX] = {
+	89100,89900,91900,99900,107700};
+static int EmultatorIdx = 0;
+
 /*---------------------------------------------------------------------------
     LOCAL FUNCTION PROTOTYPES:
 ---------------------------------------------------------------------------*/
@@ -122,7 +127,7 @@ ASM_cb_result_t	__mmradio_asm_callback(int handle, ASM_event_sources_t sound_eve
 static bool 	__is_tunable_frequency(mm_radio_t* radio, int freq);
 static int 		__mmradio_set_deemphasis(mm_radio_t* radio);
 static int 		__mmradio_set_band_range(mm_radio_t* radio);
-
+static int		__mmradio_get_wave_num(mm_radio_t *radio);
 /*===========================================================================
   FUNCTION DEFINITIONS
 ========================================================================== */
@@ -228,7 +233,6 @@ _mmradio_create_radio(mm_radio_t* radio)
 		MMRADIO_LOG_ERROR("failed to register asm server\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
-
 	MMRADIO_LOG_FLEAVE();
 
 	return MM_ERROR_NONE;
@@ -251,54 +255,9 @@ _mmradio_realize(mm_radio_t* radio)
 		bool update = false;
 
 		/* open device */
-		radio->radio_fd = open(DEFAULT_DEVICE, O_RDONLY);
-		if (radio->radio_fd < 0)
-		{
-			MMRADIO_LOG_ERROR("failed to open radio device[%s] because of %s(%d)\n",
-						DEFAULT_DEVICE, strerror(errno), errno);
+		radio->radio_fd = 11;
 
-			/* check error */
-			switch (errno)
-			{
-				case ENOENT:
-					return MM_ERROR_RADIO_DEVICE_NOT_FOUND;
-				case EACCES:
-					return MM_ERROR_RADIO_PERMISSION_DENIED;
-				default:
-					return MM_ERROR_RADIO_DEVICE_NOT_OPENED;
-			}
-		}
 		MMRADIO_LOG_DEBUG("radio device fd : %d\n", radio->radio_fd);
-
-		/* query radio device capabilities. */
-		if (ioctl(radio->radio_fd, VIDIOC_QUERYCAP, &(radio->vc)) < 0)
-		{
-			MMRADIO_LOG_ERROR("VIDIOC_QUERYCAP failed!\n");
-			goto error;
-		}
-
-		if ( ! ( radio->vc.capabilities & V4L2_CAP_TUNER) )
-		{
-			MMRADIO_LOG_ERROR("this system can't support fm-radio!\n");
-			goto error;
-		}
-
-		/* set tuner audio mode */
-		ioctl(radio->radio_fd, VIDIOC_G_TUNER, &(radio->vt));
-
-		if ( ! ( (radio->vt).capability & V4L2_TUNER_CAP_STEREO) )
-		{
-			MMRADIO_LOG_ERROR("this system can support mono!\n");
-			(radio->vt).audmode = V4L2_TUNER_MODE_MONO;
-		}
-		else
-		{
-			(radio->vt).audmode = V4L2_TUNER_MODE_STEREO;
-		}
-
-		/* set tuner index. Must be 0. */
-		(radio->vt).index = TUNER_INDEX;
-		ioctl(radio->radio_fd, VIDIOC_S_TUNER, &(radio->vt));
 
 		/* check region country type if it's updated or not */
 		if ( radio->region_setting.country == MM_RADIO_REGION_GROUP_NONE)
@@ -318,8 +277,8 @@ _mmradio_realize(mm_radio_t* radio)
 	}
 
 	/* ready but nosound */
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
-		goto error;
+//	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+//		goto error;
 
 	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_READY );
 #ifdef USE_GST_PIPELINE
@@ -336,7 +295,6 @@ _mmradio_realize(mm_radio_t* radio)
 error:
 	if (radio->radio_fd >= 0)
 	{
-		close(radio->radio_fd);
 		radio->radio_fd = -1;
 	}
 
@@ -355,13 +313,12 @@ _mmradio_unrealize(mm_radio_t* radio)
 	MMRADIO_CHECK_INSTANCE( radio );
 	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_UNREALIZE );
 
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+//	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+//		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
 	/* close radio device here !!!! */
 	if (radio->radio_fd >= 0)
 	{
-		close(radio->radio_fd);
 		radio->radio_fd = -1;
 	}
 
@@ -406,14 +363,14 @@ _mmradio_destroy(mm_radio_t* radio)
 int
 _mmradio_set_frequency(mm_radio_t* radio, int freq) // unit should be KHz
 {
+	int ret = 0;
 	MMRADIO_LOG_FENTER();
 
 	MMRADIO_CHECK_INSTANCE( radio );
 	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_SET_FREQ );
 
 	MMRADIO_SLOG_DEBUG("Setting %d frequency\n", freq);
-
-	radio->freq = freq;
+	MMRADIO_LOG_DEBUG("radio->freq: %d freq: %d\n", radio->freq, freq);
 
 	if (radio->radio_fd < 0)
 	{
@@ -429,13 +386,13 @@ _mmradio_set_frequency(mm_radio_t* radio, int freq) // unit should be KHz
 		return MM_ERROR_INVALID_ARGUMENT;
 	}
 
-	/* set it */
-	(radio->vf).tuner = 0;
-	(radio->vf).frequency = RADIO_FREQ_FORMAT_SET(freq);
+	radio->freq = freq;
 
-	if(ioctl(radio->radio_fd, VIDIOC_S_FREQUENCY, &(radio->vf))< 0)
+	if(radio->pGstreamer_s)
 	{
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+		int val = 0;
+		val = __mmradio_get_wave_num(radio);
+		g_object_set(radio->pGstreamer_s->avsysaudiosrc, "wave", val, NULL);
 	}
 
 	MMRADIO_LOG_FLEAVE();
@@ -462,17 +419,7 @@ _mmradio_get_frequency(mm_radio_t* radio, int* pFreq)
 		*pFreq = radio->freq;
 		return MM_ERROR_NONE;
 	}
-
-	if (ioctl(radio->radio_fd, VIDIOC_G_FREQUENCY, &(radio->vf)) < 0)
-	{
-		MMRADIO_LOG_ERROR("failed to do VIDIOC_G_FREQUENCY\n");
-		return MM_ERROR_RADIO_INTERNAL;
-	}
-
-	freq = RADIO_FREQ_FORMAT_GET((radio->vf).frequency);
-
 	/* update freq in handle */
-	radio->freq = freq;
 
 	*pFreq = radio->freq;
 
@@ -494,12 +441,9 @@ _mmradio_mute(mm_radio_t* radio)
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
-	(radio->vctrl).id = V4L2_CID_AUDIO_MUTE;
-	(radio->vctrl).value = 1; //mute
-
-	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0)
-	{
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+	if(radio->pGstreamer_s){
+		g_object_set(radio->pGstreamer_s->volume, "mute", 1, NULL);
+		MMRADIO_LOG_DEBUG("g_object set mute\n");
 	}
 
 	MMRADIO_LOG_FLEAVE();
@@ -517,12 +461,9 @@ _mmradio_unmute(mm_radio_t* radio)
 	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_UNMUTE );
 	MMRADIO_CHECK_DEVICE_STATE( radio );
 
-	(radio->vctrl).id = V4L2_CID_AUDIO_MUTE;
-	(radio->vctrl).value = 0; //unmute
-
-	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0)
-	{
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+	if(radio->pGstreamer_s){
+		g_object_set(radio->pGstreamer_s->volume, "mute", 0, NULL);
+		MMRADIO_LOG_DEBUG("g_object set  un-mute\n");
 	}
 
 	MMRADIO_LOG_FLEAVE();
@@ -543,7 +484,7 @@ __mmradio_set_deemphasis(mm_radio_t* radio)
 	int value = 0;
 
 	MMRADIO_LOG_FENTER();
-
+	return MM_ERROR_NONE;
 	MMRADIO_CHECK_INSTANCE( radio );
 
 	/* get de-emphasis */
@@ -588,7 +529,7 @@ int
 __mmradio_set_band_range(mm_radio_t* radio)
 {
 	MMRADIO_LOG_FENTER();
-
+	return MM_ERROR_NONE;
 	MMRADIO_CHECK_INSTANCE( radio );
 
 	/* get min and max freq. */
@@ -666,8 +607,8 @@ _mmradio_start(mm_radio_t* radio)
 	_mmradio_set_frequency( radio, radio->freq );
 
 	/* unmute */
-	if( _mmradio_unmute(radio) != MM_ERROR_NONE)
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+//	if( _mmradio_unmute(radio) != MM_ERROR_NONE)
+//		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
 	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_PLAYING );
 #ifdef USE_GST_PIPELINE
@@ -693,8 +634,8 @@ _mmradio_stop(mm_radio_t* radio)
 	MMRADIO_CHECK_INSTANCE( radio );
 	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_STOP );
 
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+//	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+//		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
 	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_READY );
 
@@ -722,37 +663,42 @@ int
 _mmradio_realize_pipeline(mm_radio_t* radio)
 {
 	int ret = MM_ERROR_NONE;
-
+	int val = 0;
+	MMRADIO_LOG_FENTER();
 	gst_init (NULL, NULL);
 	radio->pGstreamer_s = g_new0 (mm_radio_gstreamer_s, 1);
 
-	radio->pGstreamer_s->pipeline= gst_pipeline_new ("avsysaudio");
+	radio->pGstreamer_s->pipeline= gst_pipeline_new ("fmradio");
 
-	radio->pGstreamer_s->avsysaudiosrc= gst_element_factory_make("avsysaudiosrc","fm audio src");
+	radio->pGstreamer_s->avsysaudiosrc= gst_element_factory_make("audiotestsrc","fm audio src");
 	radio->pGstreamer_s->queue2= gst_element_factory_make("queue2","queue2");
+	radio->pGstreamer_s->volume= gst_element_factory_make("volume","volume");
 	radio->pGstreamer_s->avsysaudiosink= gst_element_factory_make("pulsesink","audio sink");
 
-	g_object_set(radio->pGstreamer_s->avsysaudiosrc, "latency", 2, NULL);
-	g_object_set(radio->pGstreamer_s->avsysaudiosink, "sync", false, NULL);
+	val = __mmradio_get_wave_num(radio);
+	g_object_set(radio->pGstreamer_s->avsysaudiosrc, "wave", val, "volume", 0.8, NULL);
 
-	if (!radio->pGstreamer_s->pipeline || !radio->pGstreamer_s->avsysaudiosrc || !radio->pGstreamer_s->queue2 || !radio->pGstreamer_s->avsysaudiosink) {
-		debug_error("[%s][%05d] One element could not be created. Exiting.\n", __func__, __LINE__);
+	if (!radio->pGstreamer_s->pipeline || !radio->pGstreamer_s->avsysaudiosrc || !radio->pGstreamer_s->queue2 || !radio->pGstreamer_s->volume || !radio->pGstreamer_s->avsysaudiosink) {
+		MMRADIO_LOG_DEBUG("[%s][%05d] One element could not be created. Exiting.\n", __func__, __LINE__);
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
 	gst_bin_add_many(GST_BIN(radio->pGstreamer_s->pipeline),
 			radio->pGstreamer_s->avsysaudiosrc,
 			radio->pGstreamer_s->queue2,
+			radio->pGstreamer_s->volume,
 			radio->pGstreamer_s->avsysaudiosink,
 			NULL);
 	if(!gst_element_link_many(
 			radio->pGstreamer_s->avsysaudiosrc,
 			radio->pGstreamer_s->queue2,
+			radio->pGstreamer_s->volume,
 			radio->pGstreamer_s->avsysaudiosink,
 			NULL)) {
-		debug_error("[%s][%05d] Fail to link b/w appsrc and ffmpeg in rotate\n", __func__, __LINE__);
+		MMRADIO_LOG_DEBUG(,"[%s][%05d] Fail to link b/w appsrc and ffmpeg in rotate\n", __func__, __LINE__);
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
+	MMRADIO_LOG_FLEAVE();
 	return ret;
 }
 
@@ -761,10 +707,11 @@ _mmradio_start_pipeline(mm_radio_t* radio)
 {
 	int ret = MM_ERROR_NONE;
 	GstStateChangeReturn ret_state;
-	debug_log("\n");
+
+	MMRADIO_LOG_FENTER();
 
 	if(gst_element_set_state (radio->pGstreamer_s->pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
-		debug_error("Fail to change pipeline state");
+		MMRADIO_LOG_DEBUG("Fail to change pipeline state");
 		gst_object_unref (radio->pGstreamer_s->pipeline);
 		g_free (radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
@@ -772,25 +719,26 @@ _mmradio_start_pipeline(mm_radio_t* radio)
 
 	ret_state = gst_element_get_state (radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
 	if (ret_state == GST_STATE_CHANGE_FAILURE) {
-		debug_error("GST_STATE_CHANGE_FAILURE");
+		MMRADIO_LOG_DEBUG("GST_STATE_CHANGE_FAILURE");
 		gst_object_unref (radio->pGstreamer_s->pipeline);
 		g_free (radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	} else {
-		debug_log("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
+		MMRADIO_LOG_DEBUG("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
 	}
+
+	MMRADIO_LOG_FLEAVE();
 	return ret;
 }
-
 int
 _mmradio_stop_pipeline(mm_radio_t* radio)
 {
 	int ret = MM_ERROR_NONE;
 	GstStateChangeReturn ret_state;
 
-	debug_log("\n");
+	MMRADIO_LOG_FENTER();
 	if(gst_element_set_state (radio->pGstreamer_s->pipeline, GST_STATE_READY) == GST_STATE_CHANGE_FAILURE) {
-		debug_error("Fail to change pipeline state");
+		MMRADIO_LOG_DEBUG("Fail to change pipeline state");
 		gst_object_unref (radio->pGstreamer_s->pipeline);
 		g_free (radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
@@ -798,13 +746,14 @@ _mmradio_stop_pipeline(mm_radio_t* radio)
 
 	ret_state = gst_element_get_state (radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
 	if (ret_state == GST_STATE_CHANGE_FAILURE) {
-		debug_error("GST_STATE_CHANGE_FAILURE");
+		MMRADIO_LOG_DEBUG("GST_STATE_CHANGE_FAILURE");
 		gst_object_unref (radio->pGstreamer_s->pipeline);
 		g_free (radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	} else {
-		debug_log("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
+		MMRADIO_LOG_DEBUG("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
 	}
+	MMRADIO_LOG_FLEAVE();
 	return ret;
 }
 
@@ -813,10 +762,10 @@ _mmradio_destroy_pipeline(mm_radio_t * radio)
 {
 	int ret = 0;
 	GstStateChangeReturn ret_state;
-	debug_log("\n");
+	MMRADIO_LOG_FENTER();
 
 	if(gst_element_set_state (radio->pGstreamer_s->pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
-		debug_error("Fail to change pipeline state");
+		MMRADIO_LOG_DEBUG("Fail to change pipeline state");
 		gst_object_unref (radio->pGstreamer_s->pipeline);
 		g_free (radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
@@ -824,15 +773,17 @@ _mmradio_destroy_pipeline(mm_radio_t * radio)
 
 	ret_state = gst_element_get_state (radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
 	if (ret_state == GST_STATE_CHANGE_FAILURE) {
-		debug_error("GST_STATE_CHANGE_FAILURE");
+		MMRADIO_LOG_DEBUG("GST_STATE_CHANGE_FAILURE");
 		gst_object_unref (radio->pGstreamer_s->pipeline);
 		g_free (radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	} else {
-		debug_log("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
+		MMRADIO_LOG_DEBUG("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
 	}
+
 	gst_object_unref (radio->pGstreamer_s->pipeline);
 	g_free (radio->pGstreamer_s);
+	MMRADIO_LOG_FLEAVE();
 	return ret;
 }
 #endif
@@ -847,8 +798,8 @@ _mmradio_seek(mm_radio_t* radio, MMRadioSeekDirectionType direction)
 
  	int ret = 0;
 
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
-		return MM_ERROR_RADIO_NOT_INITIALIZED;
+//	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+//		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
 	MMRADIO_SLOG_DEBUG("trying to seek. direction[0:UP/1:DOWN) %d\n", direction);
 	radio->seek_direction = direction;
@@ -935,12 +886,9 @@ _mm_radio_get_signal_strength(mm_radio_t* radio, int *value)
 		*value = 0;
 		return MM_ERROR_NONE;
 	}
-	if (ioctl(radio->radio_fd, VIDIOC_G_TUNER, &(radio->vt)) < 0)
-	{
-		debug_error("ioctl VIDIOC_G_TUNER error\n");
-		return MM_ERROR_RADIO_INTERNAL;
-	}
-        *value = radio->vt.signal;
+
+	srand((unsigned)time(NULL));
+	*value = 0 - ((rand() % 20 + 1) + 80);
 	MMRADIO_LOG_FLEAVE();
 	return MM_ERROR_NONE;
 }
@@ -950,16 +898,12 @@ __mmradio_scan_thread(mm_radio_t* radio)
 {
 	int ret = 0;
 	int prev_freq = 0;
-	struct v4l2_hw_freq_seek vs = {0,};
-	vs.tuner = TUNER_INDEX;
-	vs.type = V4L2_TUNER_RADIO;
-	vs.wrap_around = 0; /* around:1 not around:0 */
-	vs.seek_upward = 1; /* up : 1	------- down : 0 */
+	EmultatorIdx = 0;
 
 	MMRADIO_LOG_FENTER();
 	MMRADIO_CHECK_INSTANCE( radio );
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
-		goto FINISHED;
+//	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+//		goto FINISHED;
 
 	if( _mmradio_set_frequency(radio, radio->region_setting.band_min) != MM_ERROR_NONE)
 		goto FINISHED;
@@ -973,38 +917,17 @@ __mmradio_scan_thread(mm_radio_t* radio)
 		MMMessageParamType param = {0,};
 
 		MMRADIO_LOG_DEBUG("scanning....\n");
-		ret = ioctl(radio->radio_fd, VIDIOC_S_HW_FREQ_SEEK, &vs);
-
-		if( ret == -1 )
-		{
-			if ( errno == EAGAIN )
-			{
-				MMRADIO_LOG_ERROR("scanning timeout\n");
-				continue;
-			}
-			else if ( errno == EINVAL )
-			{
-				MMRADIO_LOG_ERROR("The tuner index is out of bounds or the value in the type field is wrong.");
-				break;
-			}
-			else
-			{
-				MMRADIO_LOG_ERROR("Error: %s, %d\n", strerror(errno), errno);
-				break;
-			}
-		}
 
 		/* now we can get new frequency from radio device */
 
 		if ( radio->stop_scan ) break;
 
-		ret = _mmradio_get_frequency(radio, &freq);
-		if ( ret )
 		{
-			MMRADIO_LOG_ERROR("failed to get current frequency\n");
-		}
-		else
-		{
+			usleep(1000 * 1000);
+			freq =  MMRadioEmulatorFreq[EmultatorIdx] ;
+ 			MMRADIO_LOG_DEBUG("freq: %d", freq);
+
+
 			if ( freq < prev_freq )
 			{
 				MMRADIO_LOG_DEBUG("scanning wrapped around. stopping scan\n");
@@ -1018,7 +941,9 @@ __mmradio_scan_thread(mm_radio_t* radio)
 			MMRADIO_SLOG_DEBUG("scanning : new frequency : [%d]\n", param.radio_scan.frequency);
 
 			/* drop if max freq is scanned */
-			if (param.radio_scan.frequency == radio->region_setting.band_max )
+			if ( param.radio_scan.frequency == radio->region_setting.band_max
+				|| param.radio_scan.frequency > radio->region_setting.band_max
+				|| param.radio_scan.frequency < radio->region_setting.band_min)
 			{
 				MMRADIO_LOG_DEBUG("%d freq is dropping...and stopping scan\n", param.radio_scan.frequency);
 				break;
@@ -1027,6 +952,7 @@ __mmradio_scan_thread(mm_radio_t* radio)
 			if ( radio->stop_scan ) break; // doesn't need to post
 
 			MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SCAN_INFO, &param);
+			EmultatorIdx++;
 		}
 	}
 FINISHED:
@@ -1094,34 +1020,25 @@ __mmradio_seek_thread(mm_radio_t* radio)
 
 	while (  ! seek_stop )
 	{
-		ret = ioctl( radio->radio_fd, VIDIOC_S_HW_FREQ_SEEK, &vs );
-
-		if( ret == -1 )
-		{
-			if ( errno == EAGAIN )
-			{
-				/* FIXIT : we need retrying code here */
-				MMRADIO_LOG_ERROR("scanning timeout\n");
-				goto SEEK_FAILED;
-			}
-			else if ( errno == EINVAL )
-			{
-				MMRADIO_LOG_ERROR("The tuner index is out of bounds or the value in the type field is wrong.");
-				goto SEEK_FAILED;
-			}
-			else
-			{
-				MMRADIO_LOG_ERROR("Error: %s, %d\n", strerror(errno), errno);
-				goto SEEK_FAILED;
-			}
-		}
-
 		/* now we can get new frequency from radio device */
-		ret = _mmradio_get_frequency(radio, &freq);
-		if ( ret )
 		{
-			MMRADIO_LOG_ERROR("failed to get current frequency\n");
-			goto SEEK_FAILED;
+			MMRADIO_LOG_DEBUG("start radio->freq: %d", radio->freq);
+			int i = 0;
+			for(i = 0; i < EMULATOR_FREQ_MAX; i++)
+				if(MMRadioEmulatorFreq[i] == radio->freq)
+					EmultatorIdx = i;
+
+			if(vs.seek_upward == 1){
+				if(EmultatorIdx == EMULATOR_FREQ_MAX - 1) EmultatorIdx = -1;
+				freq = MMRadioEmulatorFreq[EmultatorIdx + 1];
+			}
+			else{
+				if(EmultatorIdx == 0) EmultatorIdx = EMULATOR_FREQ_MAX;
+				freq = MMRadioEmulatorFreq[EmultatorIdx - 1];
+			}
+
+			radio->freq = freq;
+			MMRADIO_LOG_DEBUG("radio->freq: %d", radio->freq);
 		}
 
 		MMRADIO_LOG_DEBUG("found frequency\n");
@@ -1148,13 +1065,14 @@ __mmradio_seek_thread(mm_radio_t* radio)
 		  * In the case of limit freq, tuner should be unmuted.
 		  * Otherwise, sound can't output even though application set new frequency.
 		  */
+#if 0
 		ret = _mmradio_unmute(radio);
 		if ( ret )
 		{
 			MMRADIO_LOG_ERROR("failed to tune to new frequency\n");
 			goto SEEK_FAILED;
 		}
-
+#endif
 		param.radio_scan.frequency = radio->prev_seek_freq = freq;
 		MMRADIO_SLOG_DEBUG("seeking : new frequency : [%d]\n", param.radio_scan.frequency);
 		MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SEEK_FINISH, &param);
@@ -1478,7 +1396,8 @@ __mmradio_asm_callback(int handle, ASM_event_sources_t event_source, ASM_sound_c
 	return cb_res;
 }
 
-int _mmradio_get_region_type(mm_radio_t*radio, MMRadioRegionType *type)
+int
+_mmradio_get_region_type(mm_radio_t*radio, MMRadioRegionType *type)
 {
 	MMRADIO_LOG_FENTER();
 	MMRADIO_CHECK_INSTANCE( radio );
@@ -1492,7 +1411,8 @@ int _mmradio_get_region_type(mm_radio_t*radio, MMRadioRegionType *type)
 	return MM_ERROR_NONE;
 }
 
-int _mmradio_get_region_frequency_range(mm_radio_t* radio, unsigned int *min_freq, unsigned int *max_freq)
+int
+_mmradio_get_region_frequency_range(mm_radio_t* radio, unsigned int *min_freq, unsigned int *max_freq)
 {
 	MMRADIO_LOG_FENTER();
 	MMRADIO_CHECK_INSTANCE( radio );
@@ -1505,4 +1425,39 @@ int _mmradio_get_region_frequency_range(mm_radio_t* radio, unsigned int *min_fre
 
 	MMRADIO_LOG_FLEAVE();
 	return MM_ERROR_NONE;
+}
+
+static int
+__mmradio_get_wave_num(mm_radio_t *radio)
+{
+	int val = 0;
+	MMRADIO_LOG_FENTER();
+	switch(radio->freq){
+	case 89100:
+		val = 1;
+		break;
+
+	case 89900:
+		val = 5;
+		break;
+
+	case 91900:
+		val = 6;
+		break;
+
+	case 99900:
+		val = 8;
+		break;
+
+	case 107700:
+		val = 9;
+		break;
+
+	default :
+		val = 9;
+		break;
+	}
+	MMRADIO_LOG_DEBUG("freq: %d, val : %d", radio->freq, val);
+	MMRADIO_LOG_FLEAVE();
+	return val;
 }
