@@ -34,6 +34,7 @@
 #define MMRADIO_LOG_ERROR		debug_error
 #define MMRADIO_LOG_WARNING	debug_warning
 #define MMRADIO_LOG_CRITICAL	debug_critical
+#define MMRADIO_SLOG_DEBUG		secure_debug_log
 
 /* general */
 #ifndef ARRAY_SIZE
@@ -52,6 +53,13 @@ if ( ! x_radio ) \
 { \
 	debug_error("radio instance is NULL\n"); \
 	return MM_ERROR_RADIO_NOT_INITIALIZED; \
+}
+
+#define MMRADIO_CHECK_INSTANCE_RETURN_VOID( x_radio ) \
+if ( ! x_radio ) \
+{ \
+	debug_error("radio instance is NULL\n"); \
+	return; \
 }
 
 #define MMRADIO_CHECK_DEVICE_STATE( x_radio ) \

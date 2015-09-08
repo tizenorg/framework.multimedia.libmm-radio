@@ -36,10 +36,6 @@ PKG_CHECK_MODULES(MMCOMMON, mm-common)
 AC_SUBST(MMCOMMON_CFLAGS)
 AC_SUBST(MMCOMMON_LIBS)
 
-PKG_CHECK_MODULES(MMTA, mm-ta)
-AC_SUBST(MMTA_CFLAGS)
-AC_SUBST(MMTA_LIBS)
-
 PKG_CHECK_MODULES(GST, gstreamer-0.10)
 AC_SUBST(GST_CFLAGS)
 AC_SUBST(GST_LIBS)
@@ -59,6 +55,16 @@ AC_SUBST(AUDIOSESSIONMGR_LIBS)
 PKG_CHECK_MODULES(MMSOUND, mm-sound)
 AC_SUBST(MMSOUND_CFLAGS)
 AC_SUBST(MMSOUND_LIBS)
+
+AC_ARG_ENABLE(emulator, AC_HELP_STRING([--enable-emulator], [using emulator interface]),
+[
+ case "${enableval}" in
+         yes) ENABLE_EMULATOR=yes ;;
+         no)  ENABLE_EMULATOR=no ;;
+         *)   AC_MSG_ERROR(bad value ${enableval} for --enable-emulator) ;;
+ esac
+ ],[ENABLE_EMULATOR=no])
+AM_CONDITIONAL(ENABLE_EMULATOR, test "x$ENABLE_EMULATOR" = "xyes")
 
 AC_CONFIG_FILES([
 	Makefile

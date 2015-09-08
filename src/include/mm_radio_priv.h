@@ -18,7 +18,7 @@
  * limitations under the License.
  *
  */
- 
+
 #ifndef __MM_Radio_INTERNAL_H__
 #define	__MM_Radio_INTERNAL_H__
 
@@ -42,7 +42,7 @@
 
 #include <gst/gst.h>
 #include <gst/gstbuffer.h>
- 
+
 #ifdef __cplusplus
 	extern "C" {
 #endif
@@ -139,6 +139,7 @@ typedef struct _mm_radio_gstreamer_s
 	GstElement *pipeline;
 	GstElement *avsysaudiosrc;
 	GstElement *queue2;
+	GstElement *volume;
 	GstElement *avsysaudiosink;
 	GstBuffer *output_buffer;
 } mm_radio_gstreamer_s;
@@ -213,6 +214,7 @@ int _mmradio_stop(mm_radio_t* radio);
 int _mmradio_seek(mm_radio_t* radio, MMRadioSeekDirectionType direction);
 int _mmradio_start_scan(mm_radio_t* radio);
 int _mmradio_stop_scan(mm_radio_t* radio);
+int _mm_radio_get_signal_strength(mm_radio_t* radio, int *value);
 #ifdef USE_GST_PIPELINE
 int _mmradio_realize_pipeline( mm_radio_t* radio);
 int _mmradio_start_pipeline(mm_radio_t* radio);

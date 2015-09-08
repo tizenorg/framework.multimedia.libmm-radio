@@ -22,7 +22,6 @@
 /* testsuite for mm-radio library */
 #include <stdlib.h>
 #include <stdio.h>
-#include <mm_ta.h>
 
 
 #include "mm_radio.h"
@@ -114,22 +113,21 @@ int g_num_of_tests = 0;
 
 int main(int argc, char **argv)
 {
-	MMTA_INIT();
-	char key = 0;
+	int key = 0;
 
 	do {
 		__print_menu();
 
 		do {
 			key = getchar();
-			
+
 			if ( key >= '0' && key <= '9')
 			{
 				__run_test( key - '0' );
 			}
 		}while ( key == '\n' );
 	}while(key != 'q' && key == 'Q');
-	
+
 	printf("radio test client finished\n");
 
 	return 0;
@@ -195,7 +193,6 @@ static int __msg_callback(int message, void *pParam, void *user_param)
 	switch(message)
 	{
 	case MM_MESSAGE_STATE_CHANGED:
-
 		printf("MM_MESSAGE_STATE_CHANGED: current : %d    old : %d\n"
 				, param->state.current, param->state.previous);
 		break;
@@ -218,6 +215,13 @@ static int __msg_callback(int message, void *pParam, void *user_param)
 			break;
 	case MM_MESSAGE_RADIO_SEEK_FINISH:
 		printf("MM_MESSAGE_RADIO_SEEK_FINISHED : freq : %d KHz\n", param->radio_scan.frequency);
+		break;
+	case MM_MESSAGE_STATE_INTERRUPTED:
+		printf("MM_MESSAGE_STATE_INTERRUPTED code - %d\n", param->code);
+		break;
+	case MM_MESSAGE_READY_TO_RESUME:
+		printf("MM_MESSAGE_READY_TO_RESUME\n");
+		RADIO_TEST__( mm_radio_start(radio); )
 		break;
 	default:
 		printf("ERROR : unknown message received!\n");
@@ -255,7 +259,6 @@ int __test_radio_listen_gorealra(void)
 	RADIO_TEST__( mm_radio_realize(radio); )
 	RADIO_TEST__( mm_radio_set_frequency( radio, DEFAULT_TEST_FREQ ); )
 	RADIO_TEST__( mm_radio_start(radio); )
-
 	return ret;
 }
 

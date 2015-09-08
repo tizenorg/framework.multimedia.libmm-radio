@@ -18,7 +18,7 @@
  * limitations under the License.
  *
  */
- 
+
 /*===========================================================================================
 |																							|
 |  INCLUDE FILES																			|
@@ -32,7 +32,6 @@
 #include <mm_types.h>
 #include <mm_message.h>
 #include "mm_debug.h"
-#include <mm_ta.h>
 
 /*===========================================================================================
 |																							|
@@ -86,12 +85,11 @@ int mm_radio_create(MMHandleType *hradio)
 {
 	int result = MM_ERROR_NONE;
 	mm_radio_t* new_radio = NULL;
-	
+
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(hradio, MM_ERROR_RADIO_NOT_INITIALIZED);
 
-	MMTA_INIT();
 
 	/* alloc radio structure */
 	new_radio = (mm_radio_t*) malloc(sizeof(mm_radio_t));
@@ -124,9 +122,9 @@ ERROR:
 	*hradio = (MMHandleType)0;
 
 	MMRADIO_LOG_FLEAVE();
-	
+
 	/* FIXIT : need to specify more error case */
-	return MM_ERROR_RADIO_NO_FREE_SPACE; 
+	return result;
 }
 
 int  mm_radio_destroy(MMHandleType hradio)
@@ -135,26 +133,23 @@ int  mm_radio_destroy(MMHandleType hradio)
 	mm_radio_t* radio = (mm_radio_t*)hradio;
 
 	MMRADIO_LOG_FENTER();
-	
+
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
 
-	result = _mmradio_destroy( radio ); 
-	
+	result = _mmradio_destroy( radio );
+
 	if ( result != MM_ERROR_NONE )
 	{
 		debug_error("failed to destroy radio\n");
 	}
-	
+
 	/* free radio */
 	MMRADIO_FREEIF( radio );
 
-	MMTA_ACUM_ITEM_SHOW_RESULT_TO(MMTA_SHOW_FILE);
-	//MMTA_ACUM_ITEM_SHOW_RESULT_TO(MMTA_SHOW_STDOUT);
 
-	MMTA_RELEASE();
 
 	MMRADIO_LOG_FLEAVE();
-	
+
 	return result;
 }
 
@@ -162,16 +157,14 @@ int mm_radio_realize(MMHandleType hradio)
 {
 	int result = MM_ERROR_NONE;
 	mm_radio_t* radio = (mm_radio_t*)hradio;
-	
+
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
 
 	MMRADIO_CMD_LOCK( radio );
 
-	__ta__("[KPI] initialize media radio service", 
-		   result = _mmradio_realize( radio );
-	)
+	result = _mmradio_realize( radio );
 
 	MMRADIO_CMD_UNLOCK( radio );
 
@@ -184,21 +177,19 @@ int mm_radio_unrealize(MMHandleType hradio)
 {
 	int result = MM_ERROR_NONE;
 	mm_radio_t* radio = (mm_radio_t*)hradio;
-	
+
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
 
 	MMRADIO_CMD_LOCK( radio );
 
-	__ta__("[KPI] cleanup media radio service", 
-		   result = _mmradio_unrealize( radio );
-	)
-	
+	result = _mmradio_unrealize( radio );
+
 	MMRADIO_CMD_UNLOCK( radio );
 
 	MMRADIO_LOG_FLEAVE();
-	
+
 	return result;
 }
 
@@ -206,7 +197,7 @@ int mm_radio_set_message_callback(MMHandleType hradio, MMMessageCallback callbac
 {
 	int result = MM_ERROR_NONE;
 	mm_radio_t* radio = (mm_radio_t*)hradio;
-	
+
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
@@ -218,7 +209,7 @@ int mm_radio_set_message_callback(MMHandleType hradio, MMMessageCallback callbac
 	MMRADIO_CMD_UNLOCK( radio );
 
 	MMRADIO_LOG_FLEAVE();
-	
+
 	return result;
 }
 
@@ -227,9 +218,9 @@ int mm_radio_get_state(MMHandleType hradio, MMRadioStateType* pState)
 	int result = MM_ERROR_NONE;
 	mm_radio_t* radio = (mm_radio_t*)hradio;
 	int state = 0;
-	
+
 	MMRADIO_LOG_FENTER();
-	
+
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
 	return_val_if_fail(pState, MM_ERROR_COMMON_INVALID_ARGUMENT);
 
@@ -250,14 +241,13 @@ int mm_radio_start(MMHandleType hradio)
 {
 	int result = MM_ERROR_NONE;
 	mm_radio_t* radio = (mm_radio_t*)hradio;
-	
+
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
 
 	MMRADIO_CMD_LOCK( radio );
 
-	MMTA_ACUM_ITEM_BEGIN("[KPI] start media radio service", false);
 	result = _mmradio_start( radio );
 
 	MMRADIO_CMD_UNLOCK( radio );
@@ -271,16 +261,14 @@ int  mm_radio_stop(MMHandleType hradio)
 {
 	int result = MM_ERROR_NONE;
 	mm_radio_t* radio = (mm_radio_t*)hradio;
-	
+
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
 
 	MMRADIO_CMD_LOCK( radio );
 
-	__ta__("[KPI] stop media radio service",
-		   result = _mmradio_stop( radio ); 
-	)
+	result = _mmradio_stop( radio );
 
 	MMRADIO_CMD_UNLOCK( radio );
 
@@ -297,9 +285,11 @@ int mm_radio_seek(MMHandleType hradio, MMRadioSeekDirectionType direction)
 	MMRADIO_LOG_FENTER();
 
 	return_val_if_fail(radio, MM_ERROR_RADIO_NOT_INITIALIZED);
-	return_val_if_fail(direction >= MM_RADIO_SEEK_UP && direction <= MM_RADIO_SEEK_DOWN, MM_ERROR_INVALID_ARGUMENT);	
+	return_val_if_fail(direction >= MM_RADIO_SEEK_UP && direction <= MM_RADIO_SEEK_DOWN, MM_ERROR_INVALID_ARGUMENT);
 
 	MMRADIO_CMD_LOCK( radio );
+
+	radio->seek_direction = direction;
 
 	result = _mmradio_seek( radio, direction );
 
@@ -405,7 +395,7 @@ int mm_radio_set_mute(MMHandleType hradio, bool muted)
 
 	MMRADIO_CMD_LOCK(radio);
 
-	if (muted) 
+	if (muted)
 	{
 		result = _mmradio_mute(radio);
 	}
@@ -434,14 +424,7 @@ int mm_radio_get_signal_strength(MMHandleType hradio, int *value)
 
 	MMRADIO_CMD_LOCK( radio );
 
-	if (ioctl(radio->radio_fd, VIDIOC_G_TUNER, &(radio->vt)) < 0)
-	{
-		debug_error("ioctl VIDIOC_G_TUNER error\n");
-
-		return MM_ERROR_RADIO_INTERNAL;
-	}
-
-	*value = radio->vt.signal;
+	ret = _mm_radio_get_signal_strength(radio, value);
 
 	MMRADIO_CMD_UNLOCK( radio );
 
