@@ -1,6 +1,6 @@
 Name:       libmm-radio
 Summary:    Multimedia Framework Radio Library
-Version:    0.2.15
+Version:    0.2.14
 Release:    0
 Group:      System/Libraries
 License:    Apache-2.0
@@ -12,8 +12,11 @@ BuildRequires:  pkgconfig(mm-common)
 BuildRequires:  pkgconfig(mm-log)
 BuildRequires:  pkgconfig(mm-session)
 BuildRequires:  pkgconfig(mm-sound)
-BuildRequires:  pkgconfig(gstreamer-0.10)
-BuildRequires:  pkgconfig(gstreamer-plugins-base-0.10)
+BuildRequires:  pkgconfig(gstreamer-1.0)
+BuildRequires:  pkgconfig(gstreamer-plugins-base-1.0)
+BuildRequires:  pkgconfig(ttrace)
+BuildRequires:  pkgconfig(dbus-1)
+BuildRequires:  pkgconfig(iniparser)
 
 %description
 Description: Multimedia Framework Radio Library
@@ -32,10 +35,14 @@ Description: Multimedia Framework Radio Library (DEV)
 
 %build
 ./autogen.sh
-CFLAGS=" %{optflags} -Wall -DEXPORT_API=\"__attribute__((visibility(\\\"default\\\")))\" "; export CFLAGS;
+CFLAGS=" %{optflags} -Wall -DENABLE_TTRACE -DEXPORT_API=\"__attribute__((visibility(\\\"default\\\")))\" "; export CFLAGS;
+
 %configure \
 %ifarch i586
 --enable-emulator \
+%endif
+%if "%{?tizen_target_name}"== "Z300H"
+--enable-sprd \
 %endif
 --disable-static --prefix=%{_prefix}
 
@@ -60,6 +67,9 @@ cp LICENSE.APLv2 %{buildroot}/usr/share/license/%{name}
 %defattr(-,root,root,-)
 %{_libdir}/libmmfradio.so.*
 %{_bindir}/mm_radio_testsuite
+%ifarch %{arm}
+%{_libdir}/udev/rules.d/96-fm-radio.rules
+%endif
 /usr/share/license/%{name}
 
 

@@ -24,7 +24,7 @@
 #include "mm_radio_asm.h"
 #include "mm_radio_utils.h"
 
-int mmradio_asm_register(MMRadioASM* sm, ASM_sound_cb_t callback, void* param)
+int mmradio_asm_register(MMRadioASM *sm, ASM_sound_cb_t callback, void *param)
 {
 	/* read mm-session information */
 	int session_type = MM_SESSION_TYPE_MEDIA;
@@ -36,49 +36,40 @@ int mmradio_asm_register(MMRadioASM* sm, ASM_sound_cb_t callback, void* param)
 
 	MMRADIO_LOG_FENTER();
 
-	if ( ! sm )
-	{
+	if (!sm) {
 		MMRADIO_LOG_ERROR("invalid session handle\n");
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
 	/* read session information */
 	errorcode = _mm_session_util_read_information(pid, &session_type, &session_options);
-		if ( errorcode )
-		{
+	if (errorcode) {
 		debug_warning("Read Session Information failed. use default \"media\" type\n");
 		session_type = MM_SESSION_TYPE_MEDIA;
 	}
 
 	/* check if it's MEDIA type */
-	if ( session_type != MM_SESSION_TYPE_MEDIA)
-	{
+	if (session_type != MM_SESSION_TYPE_MEDIA) {
 		MMRADIO_LOG_DEBUG("session type is not MEDIA (%d)\n", session_type);
 		return MM_ERROR_RADIO_INTERNAL;
 	}
 
 	/* check if it's running on the media_server */
-	if ( sm->pid > 0 )
-	{
+	if (sm->pid > 0) {
 		pid = sm->pid;
 		MMRADIO_LOG_DEBUG("mm-radio is running on different process. Just faking pid to [%d]. :-p\n", pid);
-	}
-	else
-	{
+	} else {
 		MMRADIO_LOG_DEBUG("no pid has assigned. using default(current) context\n");
 	}
 
 	/* register audio-session-manager callback */
-	if( ! ASM_register_sound(pid, &asm_handle, event_type, ASM_STATE_NONE, callback, (void*)param, ASM_RESOURCE_NONE, &errorcode))
-	{
+	if (!ASM_register_sound(pid, &asm_handle, event_type, ASM_STATE_NONE, callback, (void *)param, ASM_RESOURCE_NONE, &errorcode)) {
 		MMRADIO_LOG_CRITICAL("ASM_register_sound() failed\n");
 		return errorcode;
 	}
 	/* set session options */
-	if (session_options)
-	{
-		if( ! ASM_set_session_option(asm_handle, session_options, &errorcode))
-		{
+	if (session_options) {
+		if (!ASM_set_session_option(asm_handle, session_options, &errorcode)) {
 			debug_error("ASM_set_session_options() failed, error(%x)\n", errorcode);
 			return errorcode;
 		}
@@ -93,21 +84,19 @@ int mmradio_asm_register(MMRadioASM* sm, ASM_sound_cb_t callback, void* param)
 	return MM_ERROR_NONE;
 }
 
-int mmradio_asm_deregister(MMRadioASM* sm)
+int mmradio_asm_deregister(MMRadioASM *sm)
 {
 	int event_type = ASM_EVENT_MEDIA_FMRADIO;
 	int errorcode = 0;
 
 	MMRADIO_LOG_FENTER();
 
-	if ( ! sm )
-	{
+	if (!sm) {
 		MMRADIO_LOG_ERROR("invalid session handle\n");
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
-	if( ! ASM_unregister_sound( sm->handle, event_type, &errorcode) )
-	{
+	if (!ASM_unregister_sound(sm->handle, event_type, &errorcode)) {
 		MMRADIO_LOG_ERROR("Unregister sound failed 0x%X\n", errorcode);
 		return MM_ERROR_POLICY_INTERNAL;
 	}
@@ -117,32 +106,27 @@ int mmradio_asm_deregister(MMRadioASM* sm)
 	return MM_ERROR_NONE;
 }
 
-int mmradio_asm_set_state(MMRadioASM* sm, ASM_sound_states_t state, ASM_resource_t resource)
+int mmradio_asm_set_state(MMRadioASM *sm, ASM_sound_states_t state, ASM_resource_t resource)
 {
 	int event_type = ASM_EVENT_MEDIA_FMRADIO;
 
 	MMRADIO_LOG_FENTER();
 
-	if ( ! sm )
-	{
+	if (!sm) {
 		MMRADIO_LOG_ERROR("invalid session handle\n");
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
-	if ( sm->by_asm_cb == MMRADIO_ASM_CB_NONE ) //|| sm->state == ASM_STATE_PLAYING )
-	{
+	if (sm->by_asm_cb == MMRADIO_ASM_CB_NONE) { /*|| sm->state == ASM_STATE_PLAYING ) */
 		int ret = 0;
 
-		if( ! ASM_set_sound_state( sm->handle, event_type, state, resource, &ret) )
-		{
+		if (!ASM_set_sound_state(sm->handle, event_type, state, resource, &ret)) {
 			MMRADIO_LOG_ERROR("set ASM state to [%d] failed 0x%X\n", state, ret);
 			return MM_ERROR_POLICY_BLOCKED;
 		}
 
 		sm->state = state;
-	}
-	else // by asm callback
-	{
+	} else { /* by asm callback */
 		sm->by_asm_cb = MMRADIO_ASM_CB_NONE;
 		sm->state = state;
 	}
@@ -151,4 +135,5 @@ int mmradio_asm_set_state(MMRadioASM* sm, ASM_sound_states_t state, ASM_resource
 
 	return MM_ERROR_NONE;
 }
+
 

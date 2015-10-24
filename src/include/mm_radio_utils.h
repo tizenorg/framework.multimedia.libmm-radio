@@ -18,7 +18,7 @@
  * limitations under the License.
  *
  */
- 
+
 #ifndef __MM_RADIO_UTILS_H__
 #define __MM_RADIO_UTILS_H__
 
@@ -26,11 +26,14 @@
 #include <mm_types.h>
 #include <mm_error.h>
 #include <mm_message.h>
+#include <glib.h>
 
 /* radio log */
 #define MMRADIO_LOG_FENTER		debug_fenter
 #define MMRADIO_LOG_FLEAVE		debug_fleave
-#define MMRADIO_LOG_DEBUG		debug_log
+#define MMRADIO_LOG_INFO		debug_msg
+#define MMRADIO_LOG_DEBUG		debug_msg
+#define MMRADIO_LOG_VERBOSE		debug_log
 #define MMRADIO_LOG_ERROR		debug_error
 #define MMRADIO_LOG_WARNING	debug_warning
 #define MMRADIO_LOG_CRITICAL	debug_critical
@@ -99,9 +102,26 @@ switch ( __mmradio_check_state(x_radio, x_command) ) \
 	break; \
 }
 
+#define MMRADIO_CHECK_STATE_GOTO_IF_FAIL(ret, x_radio, x_command, goto_label ) \
+debug_log("checking radio state before doing %s\n", #x_command); \
+switch ( __mmradio_check_state(x_radio, x_command) ) \
+{ \
+	case MM_ERROR_RADIO_INVALID_STATE: \
+		ret = MM_ERROR_RADIO_INVALID_STATE; \
+		goto goto_label; \
+	break; \
+	/* NOTE : for robustness of mmfw. we won't treat it as an error */ \
+	case MM_ERROR_RADIO_NO_OP: \
+		ret = MM_ERROR_NONE; \
+		goto goto_label; \
+	break; \
+	default: \
+	break; \
+}
+
 #define MMRADIO_CHECK_RETURN_IF_FAIL( x_ret, x_msg ) \
 do \
-{ \
+	{ \
 	if( x_ret < 0 ) \
 	{ \
 		debug_error("%s error\n", x_msg);\
@@ -109,5 +129,30 @@ do \
 	} \
 } while( 0 ) ;
 
-#endif
+#define MMRADIO_CHECK_GOTO_IF_FAIL( x_ret, x_msg, goto_palce ) \
+do \
+	{ \
+	if( x_ret < 0 ) \
+	{ \
+		debug_error("%s error\n", x_msg);\
+		goto goto_palce; \
+	} \
+} while( 0 ) ;
 
+typedef void *MMRadioVenderHandle;
+
+#define FM_RADIO_TUNING_DATA_INI_DUMP(dict, path) \
+do { \
+	FILE *fp; \
+	fp = fopen(path, "w"); \
+	if (!fp) { \
+		MMRADIO_LOG_WARNING("%s open failed", path); \
+	} else { \
+		iniparser_dump_ini(dict, fp); \
+		fclose(fp); \
+	} \
+} while(0)
+
+int event_comparator(gconstpointer a, gconstpointer b, gpointer user_data);
+
+#endif

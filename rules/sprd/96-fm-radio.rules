@@ -1,0 +1,8 @@
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /dev/radio0"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/class/video4linux/radio0/fmrx_freq_offset"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/class/video4linux/radio0/fmrx_noise_power"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/class/video4linux/radio0/fmrx_pilot_power"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/devices/virtual/video4linux/radio0/fmrx_search_abort"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/devices/virtual/video4linux/radio0/fmrx_status"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/devices/virtual/video4linux/radio0/fmrx_rssi_lvl"
+SUBSYSTEM=="video4linux", DEVPATH=="/devices/virtual/video4linux/radio[0-9]", RUN+="/usr/bin/chsmack -a device::radio /sys/class/video4linux/radio0/fmrx_start_mute"

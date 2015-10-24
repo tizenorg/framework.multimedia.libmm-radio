@@ -18,7 +18,7 @@
  * limitations under the License.
  *
  */
- 
+
 #ifndef MM_RADIO_ASM_H_
 #define MM_RADIO_ASM_H_
 
@@ -34,6 +34,8 @@ enum {
 	MMRADIO_ASM_CB_POSTMSG,
 	MMRADIO_ASM_CB_SKIP_POSTMSG
 };
+
+
 typedef struct {
 	int handle;
 	int pid;
@@ -42,9 +44,19 @@ typedef struct {
 	ASM_sound_states_t state;
 } MMRadioASM;
 
+typedef struct {
+	int handle;
+	int pid;
+	int by_asm_cb;
+	int event_src;
+	int sound_focus_register;
+	int asm_session_flags;
+} MMRadioAudioFocus;
+
+
 /* returns allocated handle */
-int mmradio_asm_register(MMRadioASM* sm, ASM_sound_cb_t callback, void* param);
-int mmradio_asm_deregister(MMRadioASM* sm);
-int mmradio_asm_set_state(MMRadioASM* sm, ASM_sound_states_t state, ASM_resource_t resource);
+int mmradio_asm_register(MMRadioASM *sm, ASM_sound_cb_t callback, void *param);
+int mmradio_asm_deregister(MMRadioASM *sm);
+int mmradio_asm_set_state(MMRadioASM *sm, ASM_sound_states_t state, ASM_resource_t resource);
 
 #endif /* MM_RADIO_ASM_H_ */

@@ -67,7 +67,7 @@
 #define FREQ_FRAC				16
 #define RADIO_FREQ_FORMAT_SET(x_freq)		((x_freq) * FREQ_FRAC)
 #define RADIO_FREQ_FORMAT_GET(x_freq)		((x_freq) / FREQ_FRAC)
-#define DEFAULT_WRAP_AROUND 			1 //If non-zero, wrap around when at the end of the frequency range, else stop seeking
+#define DEFAULT_WRAP_AROUND 			1 /*If non-zero, wrap around when at the end of the frequency range, else stop seeking */
 
 #define RADIO_DEFAULT_REGION			MM_RADIO_REGION_GROUP_USA
 #define READ_MAX_BUFFER_SIZE 1024
@@ -88,40 +88,47 @@ extern int errno;
     LOCAL VARIABLE DEFINITIONS:
 ---------------------------------------------------------------------------*/
 /* radio region configuration table */
-static const MMRadioRegion_t region_table[] =
-{
-		{	/* Notrh America, South America, South Korea, Taiwan, Australia */
-			MM_RADIO_REGION_GROUP_USA,	// region type
-			MM_RADIO_DEEMPHASIS_75_US,	// de-emphasis
-			MM_RADIO_FREQ_MIN_87500_KHZ, 	// min freq.
-			MM_RADIO_FREQ_MAX_108000_KHZ,	// max freq.
-		},
-		{	/* China, Europe, Africa, Middle East, Hong Kong, India, Indonesia, Russia, Singapore */
-			MM_RADIO_REGION_GROUP_EUROPE,
-			MM_RADIO_DEEMPHASIS_50_US,
-			MM_RADIO_FREQ_MIN_87500_KHZ,
-			MM_RADIO_FREQ_MAX_108000_KHZ,
-		},
-		{
-			MM_RADIO_REGION_GROUP_JAPAN,
-			MM_RADIO_DEEMPHASIS_50_US,
-			MM_RADIO_FREQ_MIN_76100_KHZ,
-			MM_RADIO_FREQ_MAX_89900_KHZ,
-		},
+static const MMRadioRegion_t region_table[] = {
+	{	/* Notrh America, South America, South Korea, Taiwan, Australia */
+		MM_RADIO_REGION_GROUP_USA,	/* region type */
+		MM_RADIO_DEEMPHASIS_75_US,	/* de-emphasis */
+		MM_RADIO_FREQ_MIN_87500_KHZ, 	/* min freq. */
+		MM_RADIO_FREQ_MAX_108000_KHZ,	/* max freq. */
+		50,
+	},
+	{	/* China, Europe, Africa, Middle East, Hong Kong, India, Indonesia, Russia, Singapore */
+		MM_RADIO_REGION_GROUP_EUROPE,
+		MM_RADIO_DEEMPHASIS_50_US,
+		MM_RADIO_FREQ_MIN_87500_KHZ,
+		MM_RADIO_FREQ_MAX_108000_KHZ,
+		50,
+	},
+	{
+		MM_RADIO_REGION_GROUP_JAPAN,
+		MM_RADIO_DEEMPHASIS_50_US,
+		MM_RADIO_FREQ_MIN_76100_KHZ,
+		MM_RADIO_FREQ_MAX_89900_KHZ,
+		50,
+	},
 };
 /*---------------------------------------------------------------------------
     LOCAL FUNCTION PROTOTYPES:
 ---------------------------------------------------------------------------*/
-static bool	__mmradio_post_message(mm_radio_t* radio, enum MMMessageType msgtype, MMMessageParamType* param);
-static int  		__mmradio_check_state(mm_radio_t* radio, MMRadioCommand command);
-static int		__mmradio_get_state(mm_radio_t* radio);
-static bool	__mmradio_set_state(mm_radio_t* radio, int new_state);
-static void 	__mmradio_seek_thread(mm_radio_t* radio);
-static void	__mmradio_scan_thread(mm_radio_t* radio);
-ASM_cb_result_t	__mmradio_asm_callback(int handle, ASM_event_sources_t sound_event, ASM_sound_commands_t command, unsigned int sound_status, void* cb_data);
-static bool 	__is_tunable_frequency(mm_radio_t* radio, int freq);
-static int 		__mmradio_set_deemphasis(mm_radio_t* radio);
-static int 		__mmradio_set_band_range(mm_radio_t* radio);
+static bool	__mmradio_post_message(mm_radio_t *radio, enum MMMessageType msgtype, MMMessageParamType *param);
+static int  		__mmradio_check_state(mm_radio_t *radio, MMRadioCommand command);
+static int		__mmradio_get_state(mm_radio_t *radio);
+static bool	__mmradio_set_state(mm_radio_t *radio, int new_state);
+static void 	__mmradio_seek_thread(mm_radio_t *radio);
+static void	__mmradio_scan_thread(mm_radio_t *radio);
+#ifdef FEATURE_ASM_SUPPORT
+ASM_cb_result_t	__mmradio_asm_callback(int handle, ASM_event_sources_t sound_event, ASM_sound_commands_t command, unsigned int sound_status, void *cb_data);
+#else
+void _mmradio_sound_focus_cb(int id, mm_sound_focus_type_e focus_type, mm_sound_focus_state_e focus_state, const char *reason_for_change, const char *additional_info, void *user_data);
+void _mmradio_sound_focus_watch_cb(int id, mm_sound_focus_type_e focus_type, mm_sound_focus_state_e focus_state, const char *reason_for_change, const char *additional_info, void *user_data);
+#endif
+static bool 	__is_tunable_frequency(mm_radio_t *radio, int freq);
+static int 		__mmradio_set_deemphasis(mm_radio_t *radio);
+static int 		__mmradio_set_band_range(mm_radio_t *radio);
 
 /*===========================================================================
   FUNCTION DEFINITIONS
@@ -136,7 +143,7 @@ static int 		__mmradio_set_band_range(mm_radio_t* radio);
  * Return : zero on success, or negative value with error code
  *---------------------------------------------------------------------------*/
 int
-_mmradio_apply_region(mm_radio_t* radio, MMRadioRegionType region, bool update)
+_mmradio_apply_region(mm_radio_t *radio, MMRadioRegionType region, bool update)
 {
 	int ret = MM_ERROR_NONE;
 	int count = 0;
@@ -144,41 +151,38 @@ _mmradio_apply_region(mm_radio_t* radio, MMRadioRegionType region, bool update)
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_SET_REGION );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_SET_REGION);
 
 	/* if needed, radio region must be updated.
 	  * Otherwise, just applying settings to device without it.
 	  */
-	if ( update )
-	{
+	if (update) {
 		count = ARRAY_SIZE(region_table);
 
-		//TODO: if auto is supported...get the region info. here
+		/*TODO: if auto is supported...get the region info. here */
 
 		/* update radio region settings */
-		for ( index = 0; index < count; index++ )
-		{
+		for (index = 0; index < count; index++) {
 			/* find the region from pre-defined table*/
-			if (region_table[index].country == region)
-			{
+			if (region_table[index].country == region) {
 				radio->region_setting.country = region_table[index].country;
 				radio->region_setting.deemphasis = region_table[index].deemphasis;
 				radio->region_setting.band_min = region_table[index].band_min;
 				radio->region_setting.band_max = region_table[index].band_max;
+				radio->region_setting.channel_spacing = region_table[index].channel_spacing;
 			}
 		}
 	}
 
 	/* chech device is opened or not. if it's not ready, skip to apply region to device now*/
-	if (radio->radio_fd < 0)
-	{
+	if (radio->radio_fd < 0) {
 		MMRADIO_LOG_DEBUG("not opened device. just updating region info. \n");
 		return MM_ERROR_NONE;
 	}
 
 	MMRADIO_SLOG_DEBUG("setting region - country: %d, de-emphasis: %d, band range: %d ~ %d KHz\n",
-		radio->region_setting.country, radio->region_setting.deemphasis, radio->region_setting.band_min, radio->region_setting.band_max);
+	                   radio->region_setting.country, radio->region_setting.deemphasis, radio->region_setting.band_min, radio->region_setting.band_max);
 
 	/* set de-emphsasis to device */
 	ret = __mmradio_set_deemphasis(radio);
@@ -196,14 +200,14 @@ _mmradio_apply_region(mm_radio_t* radio, MMRadioRegionType region, bool update)
 }
 
 int
-_mmradio_create_radio(mm_radio_t* radio)
+_mmradio_create_radio(mm_radio_t *radio)
 {
 	int ret  = 0;
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_CREATE );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_CREATE);
 
 	/* set default value */
 	radio->radio_fd = -1;
@@ -211,19 +215,21 @@ _mmradio_create_radio(mm_radio_t* radio)
 	memset(&radio->region_setting, 0, sizeof(MMRadioRegion_t));
 
 	/* create command lock */
-	ret = pthread_mutex_init( &radio->cmd_lock, NULL );
-	if ( ret )
-	{
+	ret = pthread_mutex_init(&radio->cmd_lock, NULL);
+	if (ret) {
 		MMRADIO_LOG_ERROR("mutex creation failed\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_NULL );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_NULL);
 
 	/* register to ASM */
-	ret = mmradio_asm_register(&radio->sm, __mmradio_asm_callback, (void*)radio);
-	if ( ret )
-	{
+#ifdef FEATURE_ASM_SUPPORT
+	ret = mmradio_asm_register(&radio->sm, __mmradio_asm_callback, (void *)radio);
+#else
+	ret = mmradio_audio_focus_register(&radio->sm, _mmradio_sound_focus_cb, (void *)radio);
+#endif
+	if (ret) {
 		/* NOTE : we are dealing it as an error since we cannot expect it's behavior */
 		MMRADIO_LOG_ERROR("failed to register asm server\n");
 		return MM_ERROR_RADIO_INTERNAL;
@@ -235,32 +241,29 @@ _mmradio_create_radio(mm_radio_t* radio)
 }
 
 int
-_mmradio_realize(mm_radio_t* radio)
+_mmradio_realize(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 	char str_error[READ_MAX_BUFFER_SIZE];
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_REALIZE );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_REALIZE);
 
 	/* open radio device */
-	if(radio->radio_fd == -1)
-	{
+	if (radio->radio_fd == -1) {
 		MMRadioRegionType region = MM_RADIO_REGION_GROUP_NONE;
 		bool update = false;
 
 		/* open device */
 		radio->radio_fd = open(DEFAULT_DEVICE, O_RDONLY);
-		if (radio->radio_fd < 0)
-		{
+		if (radio->radio_fd < 0) {
 			MMRADIO_LOG_ERROR("failed to open radio device[%s] because of %s(%d)\n",
-						DEFAULT_DEVICE, strerror_r(errno, str_error, sizeof(str_error)), errno);
+			                  DEFAULT_DEVICE, strerror_r(errno, str_error, sizeof(str_error)), errno);
 
 			/* check error */
-			switch (errno)
-			{
+			switch (errno) {
 				case ENOENT:
 					return MM_ERROR_RADIO_DEVICE_NOT_FOUND;
 				case EACCES:
@@ -272,14 +275,12 @@ _mmradio_realize(mm_radio_t* radio)
 		MMRADIO_LOG_DEBUG("radio device fd : %d\n", radio->radio_fd);
 
 		/* query radio device capabilities. */
-		if (ioctl(radio->radio_fd, VIDIOC_QUERYCAP, &(radio->vc)) < 0)
-		{
+		if (ioctl(radio->radio_fd, VIDIOC_QUERYCAP, &(radio->vc)) < 0) {
 			MMRADIO_LOG_ERROR("VIDIOC_QUERYCAP failed!\n");
 			goto error;
 		}
 
-		if ( ! ( radio->vc.capabilities & V4L2_CAP_TUNER) )
-		{
+		if (!(radio->vc.capabilities & V4L2_CAP_TUNER)) {
 			MMRADIO_LOG_ERROR("this system can't support fm-radio!\n");
 			goto error;
 		}
@@ -287,13 +288,10 @@ _mmradio_realize(mm_radio_t* radio)
 		/* set tuner audio mode */
 		ioctl(radio->radio_fd, VIDIOC_G_TUNER, &(radio->vt));
 
-		if ( ! ( (radio->vt).capability & V4L2_TUNER_CAP_STEREO) )
-		{
+		if (!((radio->vt).capability & V4L2_TUNER_CAP_STEREO)) {
 			MMRADIO_LOG_ERROR("this system can support mono!\n");
 			(radio->vt).audmode = V4L2_TUNER_MODE_MONO;
-		}
-		else
-		{
+		} else {
 			(radio->vt).audmode = V4L2_TUNER_MODE_STEREO;
 		}
 
@@ -302,14 +300,11 @@ _mmradio_realize(mm_radio_t* radio)
 		ioctl(radio->radio_fd, VIDIOC_S_TUNER, &(radio->vt));
 
 		/* check region country type if it's updated or not */
-		if ( radio->region_setting.country == MM_RADIO_REGION_GROUP_NONE)
-		{
+		if (radio->region_setting.country == MM_RADIO_REGION_GROUP_NONE) {
 			/* not initialized  yet. set it with default region */
 			region = RADIO_DEFAULT_REGION;
 			update = true;
-		}
-		else // already initialized by application
-		{
+		} else { /* already initialized by application */
 			region = radio->region_setting.country;
 		}
 
@@ -319,13 +314,13 @@ _mmradio_realize(mm_radio_t* radio)
 	}
 
 	/* ready but nosound */
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+	if (_mmradio_mute(radio) != MM_ERROR_NONE)
 		goto error;
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_READY );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_READY);
 #ifdef USE_GST_PIPELINE
 	ret = _mmradio_realize_pipeline(radio);
-	if ( ret ) {
+	if (ret) {
 		debug_error("_mmradio_realize_pipeline is failed\n");
 		return ret;
 	}
@@ -335,8 +330,7 @@ _mmradio_realize(mm_radio_t* radio)
 	return MM_ERROR_NONE;
 
 error:
-	if (radio->radio_fd >= 0)
-	{
+	if (radio->radio_fd >= 0) {
 		close(radio->radio_fd);
 		radio->radio_fd = -1;
 	}
@@ -347,29 +341,31 @@ error:
 }
 
 int
-_mmradio_unrealize(mm_radio_t* radio)
+_mmradio_unrealize(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_UNREALIZE );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_UNREALIZE);
 
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+	if (_mmradio_mute(radio) != MM_ERROR_NONE)
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
 	/* close radio device here !!!! */
-	if (radio->radio_fd >= 0)
-	{
+	if (radio->radio_fd >= 0) {
 		close(radio->radio_fd);
 		radio->radio_fd = -1;
 	}
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_NULL );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_NULL);
+#ifndef FEATURE_ASM_SUPPORT
+	ret = mmradio_set_audio_focus(&radio->sm, _mmradio_sound_focus_watch_cb, FALSE, (void *)radio);
+#endif
 #ifdef USE_GST_PIPELINE
-	ret= _mmradio_destroy_pipeline(radio);
-	if ( ret ) {
+	ret = _mmradio_destroy_pipeline(radio);
+	if (ret) {
 		debug_error("_mmradio_destroy_pipeline is failed\n");
 		return ret;
 	}
@@ -381,22 +377,25 @@ _mmradio_unrealize(mm_radio_t* radio)
 }
 
 int
-_mmradio_destroy(mm_radio_t* radio)
+_mmradio_destroy(mm_radio_t *radio)
 {
 	int ret = 0;
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_DESTROY );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_DESTROY);
 
+#ifdef FEATURE_ASM_SUPPORT
 	ret = mmradio_asm_deregister(&radio->sm);
-	if ( ret )
-	{
+#else
+	ret = mmradio_audio_focus_deregister(&radio->sm);
+#endif
+	if (ret) {
 		MMRADIO_LOG_ERROR("failed to deregister asm server\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
 
-	_mmradio_unrealize( radio );
+	_mmradio_unrealize(radio);
 
 	MMRADIO_LOG_FLEAVE();
 
@@ -405,27 +404,25 @@ _mmradio_destroy(mm_radio_t* radio)
 
 
 int
-_mmradio_set_frequency(mm_radio_t* radio, int freq) // unit should be KHz
+_mmradio_set_frequency(mm_radio_t *radio, int freq) /* unit should be KHz */
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_SET_FREQ );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_SET_FREQ);
 
 	MMRADIO_SLOG_DEBUG("Setting %d frequency\n", freq);
 
 	radio->freq = freq;
 
-	if (radio->radio_fd < 0)
-	{
+	if (radio->radio_fd < 0) {
 		MMRADIO_LOG_DEBUG("radio device is not opened yet\n");
 		return MM_ERROR_NONE;
 	}
 
 	/* check frequency range */
-	if ( freq < radio->region_setting.band_min
-		|| freq > radio->region_setting.band_max )
-	{
+	if (freq < radio->region_setting.band_min
+	    || freq > radio->region_setting.band_max) {
 		MMRADIO_LOG_ERROR("out of frequency range\n", freq);
 		return MM_ERROR_INVALID_ARGUMENT;
 	}
@@ -434,8 +431,7 @@ _mmradio_set_frequency(mm_radio_t* radio, int freq) // unit should be KHz
 	(radio->vf).tuner = 0;
 	(radio->vf).frequency = RADIO_FREQ_FORMAT_SET(freq);
 
-	if(ioctl(radio->radio_fd, VIDIOC_S_FREQUENCY, &(radio->vf))< 0)
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_S_FREQUENCY, &(radio->vf)) < 0) {
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
@@ -446,26 +442,24 @@ _mmradio_set_frequency(mm_radio_t* radio, int freq) // unit should be KHz
 }
 
 int
-_mmradio_get_frequency(mm_radio_t* radio, int* pFreq)
+_mmradio_get_frequency(mm_radio_t *radio, int *pFreq)
 {
 	int freq = 0;
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_GET_FREQ );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_GET_FREQ);
 
-	return_val_if_fail( pFreq, MM_ERROR_INVALID_ARGUMENT );
+	return_val_if_fail(pFreq, MM_ERROR_INVALID_ARGUMENT);
 
 	/* just return stored frequency if radio device is not ready */
-	if ( radio->radio_fd < 0 )
-	{
+	if (radio->radio_fd < 0) {
 		MMRADIO_SLOG_DEBUG("freq : %d\n", radio->freq);
 		*pFreq = radio->freq;
 		return MM_ERROR_NONE;
 	}
 
-	if (ioctl(radio->radio_fd, VIDIOC_G_FREQUENCY, &(radio->vf)) < 0)
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_G_FREQUENCY, &(radio->vf)) < 0) {
 		MMRADIO_LOG_ERROR("failed to do VIDIOC_G_FREQUENCY\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
@@ -483,23 +477,21 @@ _mmradio_get_frequency(mm_radio_t* radio, int* pFreq)
 }
 
 int
-_mmradio_mute(mm_radio_t* radio)
+_mmradio_mute(mm_radio_t *radio)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_MUTE );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_MUTE);
 
-	if (radio->radio_fd < 0)
-	{
+	if (radio->radio_fd < 0) {
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
 	(radio->vctrl).id = V4L2_CID_AUDIO_MUTE;
-	(radio->vctrl).value = 1; //mute
+	(radio->vctrl).value = 1; /*mute */
 
-	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0)
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0) {
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
@@ -510,19 +502,18 @@ _mmradio_mute(mm_radio_t* radio)
 }
 
 int
-_mmradio_unmute(mm_radio_t* radio)
+_mmradio_unmute(mm_radio_t *radio)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_UNMUTE );
-	MMRADIO_CHECK_DEVICE_STATE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_UNMUTE);
+	MMRADIO_CHECK_DEVICE_STATE(radio);
 
 	(radio->vctrl).id = V4L2_CID_AUDIO_MUTE;
-	(radio->vctrl).value = 0; //unmute
+	(radio->vctrl).value = 0; /*unmute */
 
-	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0)
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0) {
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
@@ -539,23 +530,22 @@ _mmradio_unmute(mm_radio_t* radio)
  * Return : zero on success, or negative value with error code
  *---------------------------------------------------------------------------*/
 int
-__mmradio_set_deemphasis(mm_radio_t* radio)
+__mmradio_set_deemphasis(mm_radio_t *radio)
 {
 	int value = 0;
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
 	/* get de-emphasis */
-	switch (radio->region_setting.deemphasis)
-	{
+	switch (radio->region_setting.deemphasis) {
 		case MM_RADIO_DEEMPHASIS_50_US:
-			value = 1;//V4L2_DEEMPHASIS_50_uS;
+			value = 1;/*V4L2_DEEMPHASIS_50_uS; */
 			break;
 
 		case MM_RADIO_DEEMPHASIS_75_US:
-			value = 2;//V4L2_DEEMPHASIS_75_uS;
+			value = 2;/*V4L2_DEEMPHASIS_75_uS; */
 			break;
 
 		default:
@@ -564,11 +554,10 @@ __mmradio_set_deemphasis(mm_radio_t* radio)
 	}
 
 	/* set it to device */
-	(radio->vctrl).id = (0x009d0000 | 0x900) +1;//V4L2_CID_TUNE_DEEMPHASIS;
+	(radio->vctrl).id = (0x009d0000 | 0x900) + 1; /*V4L2_CID_TUNE_DEEMPHASIS; */
 	(radio->vctrl).value = value;
 
-	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0)
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_S_CTRL, &(radio->vctrl)) < 0) {
 		MMRADIO_LOG_ERROR("failed to set de-emphasis\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
@@ -586,19 +575,18 @@ __mmradio_set_deemphasis(mm_radio_t* radio)
  * Return : zero on success, or negative value with error code
  *---------------------------------------------------------------------------*/
 int
-__mmradio_set_band_range(mm_radio_t* radio)
+__mmradio_set_band_range(mm_radio_t *radio)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
 	/* get min and max freq. */
 	(radio->vt).rangelow = RADIO_FREQ_FORMAT_SET(radio->region_setting.band_min);
 	(radio->vt).rangehigh = RADIO_FREQ_FORMAT_SET(radio->region_setting.band_max);
 
 	/* set it to device */
-	if (ioctl(radio->radio_fd, VIDIOC_S_TUNER, &(radio->vt)) < 0 )
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_S_TUNER, &(radio->vt)) < 0) {
 		MMRADIO_LOG_ERROR("failed to set band range\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
@@ -609,11 +597,11 @@ __mmradio_set_band_range(mm_radio_t* radio)
 }
 
 int
-_mmradio_set_message_callback(mm_radio_t* radio, MMMessageCallback callback, void *user_param)
+_mmradio_set_message_callback(mm_radio_t *radio, MMMessageCallback callback, void *user_param)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
 	radio->msg_cb = callback;
 	radio->msg_cb_param = user_param;
@@ -626,16 +614,16 @@ _mmradio_set_message_callback(mm_radio_t* radio, MMMessageCallback callback, voi
 }
 
 int
-_mmradio_get_state(mm_radio_t* radio, int* pState)
+_mmradio_get_state(mm_radio_t *radio, int *pState)
 {
 	int state = 0;
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	return_val_if_fail( pState, MM_ERROR_INVALID_ARGUMENT );
+	MMRADIO_CHECK_INSTANCE(radio);
+	return_val_if_fail(pState, MM_ERROR_INVALID_ARGUMENT);
 
-	state = __mmradio_get_state( radio );
+	state = __mmradio_get_state(radio);
 
 	*pState = state;
 
@@ -645,35 +633,38 @@ _mmradio_get_state(mm_radio_t* radio, int* pState)
 }
 
 int
-_mmradio_start(mm_radio_t* radio)
+_mmradio_start(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_START );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_START);
 
 	MMRADIO_SLOG_DEBUG("now tune to frequency : %d\n", radio->freq);
 
+#ifdef FEATURE_ASM_SUPPORT
 	ret = mmradio_asm_set_state(&radio->sm, ASM_STATE_PLAYING, ASM_RESOURCE_RADIO_TUNNER);
-	if ( ret )
-	{
-		MMRADIO_LOG_ERROR("failed to set asm state to PLAYING\n");
+#else
+	ret = mmradio_set_audio_focus(&radio->sm, _mmradio_sound_focus_watch_cb, TRUE, (void *)radio);
+#endif
+	if (ret) {
+		MMRADIO_LOG_ERROR("failed to set asm state to PLAYING or audio focus\n");
 		return ret;
 	}
 
 	/* set stored frequency */
-	_mmradio_set_frequency( radio, radio->freq );
+	_mmradio_set_frequency(radio, radio->freq);
 
 	/* unmute */
-	if( _mmradio_unmute(radio) != MM_ERROR_NONE)
+	if (_mmradio_unmute(radio) != MM_ERROR_NONE)
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_PLAYING );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_PLAYING);
 #ifdef USE_GST_PIPELINE
-	ret = _mmradio_start_pipeline( radio );
-	if ( ret ) {
+	ret = _mmradio_start_pipeline(radio);
+	if (ret) {
 		debug_error("_mmradio_start_pipeline is failed\n");
 		return ret;
 	}
@@ -685,29 +676,30 @@ _mmradio_start(mm_radio_t* radio)
 }
 
 int
-_mmradio_stop(mm_radio_t* radio)
+_mmradio_stop(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_STOP );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_STOP);
 
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+	if (_mmradio_mute(radio) != MM_ERROR_NONE)
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_READY );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_READY);
 
+#ifdef FEATURE_ASM_SUPPORT
 	ret = mmradio_asm_set_state(&radio->sm, ASM_STATE_STOP, ASM_RESOURCE_NONE);
-	if ( ret )
-	{
+	if (ret) {
 		MMRADIO_LOG_ERROR("failed to set asm state to PLAYING\n");
 		return ret;
 	}
+#endif
 #ifdef USE_GST_PIPELINE
-	ret= _mmradio_stop_pipeline( radio );
-	if ( ret ) {
+	ret = _mmradio_stop_pipeline(radio);
+	if (ret) {
 		debug_error("_mmradio_stop_pipeline is failed\n");
 		return ret;
 	}
@@ -720,37 +712,37 @@ _mmradio_stop(mm_radio_t* radio)
 
 #ifdef USE_GST_PIPELINE
 int
-_mmradio_realize_pipeline(mm_radio_t* radio)
+_mmradio_realize_pipeline(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 
-	gst_init (NULL, NULL);
-	radio->pGstreamer_s = g_new0 (mm_radio_gstreamer_s, 1);
+	gst_init(NULL, NULL);
+	radio->pGstreamer_s = g_new0(mm_radio_gstreamer_s, 1);
 
-	radio->pGstreamer_s->pipeline= gst_pipeline_new ("avsysaudio");
+	radio->pGstreamer_s->pipeline = gst_pipeline_new("fmradio");
 
-	radio->pGstreamer_s->avsysaudiosrc= gst_element_factory_make("avsysaudiosrc","fm audio src");
-	radio->pGstreamer_s->queue2= gst_element_factory_make("queue2","queue2");
-	radio->pGstreamer_s->avsysaudiosink= gst_element_factory_make("pulsesink","audio sink");
+	radio->pGstreamer_s->audiosrc = gst_element_factory_make("pulsesrc", "fm audio src");
+	radio->pGstreamer_s->queue2 = gst_element_factory_make("queue2", "queue2");
+	radio->pGstreamer_s->audiosink = gst_element_factory_make("pulsesink", "audio sink");
 
-	g_object_set(radio->pGstreamer_s->avsysaudiosrc, "latency", 2, NULL);
-	g_object_set(radio->pGstreamer_s->avsysaudiosink, "sync", false, NULL);
+	/*	g_object_set(radio->pGstreamer_s->audiosrc, "latency", 2, NULL); */
+	g_object_set(radio->pGstreamer_s->audiosink, "sync", false, NULL);
 
-	if (!radio->pGstreamer_s->pipeline || !radio->pGstreamer_s->avsysaudiosrc || !radio->pGstreamer_s->queue2 || !radio->pGstreamer_s->avsysaudiosink) {
+	if (!radio->pGstreamer_s->pipeline || !radio->pGstreamer_s->audiosrc || !radio->pGstreamer_s->queue2 || !radio->pGstreamer_s->audiosink) {
 		debug_error("[%s][%05d] One element could not be created. Exiting.\n", __func__, __LINE__);
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
 	gst_bin_add_many(GST_BIN(radio->pGstreamer_s->pipeline),
-			radio->pGstreamer_s->avsysaudiosrc,
-			radio->pGstreamer_s->queue2,
-			radio->pGstreamer_s->avsysaudiosink,
-			NULL);
-	if(!gst_element_link_many(
-			radio->pGstreamer_s->avsysaudiosrc,
-			radio->pGstreamer_s->queue2,
-			radio->pGstreamer_s->avsysaudiosink,
-			NULL)) {
+	                 radio->pGstreamer_s->audiosrc,
+	                 radio->pGstreamer_s->queue2,
+	                 radio->pGstreamer_s->audiosink,
+	                 NULL);
+	if (!gst_element_link_many(
+	        radio->pGstreamer_s->audiosrc,
+	        radio->pGstreamer_s->queue2,
+	        radio->pGstreamer_s->audiosink,
+	        NULL)) {
 		debug_error("[%s][%05d] Fail to link b/w appsrc and ffmpeg in rotate\n", __func__, __LINE__);
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
@@ -758,24 +750,24 @@ _mmradio_realize_pipeline(mm_radio_t* radio)
 }
 
 int
-_mmradio_start_pipeline(mm_radio_t* radio)
+_mmradio_start_pipeline(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 	GstStateChangeReturn ret_state;
 	debug_log("\n");
 
-	if(gst_element_set_state (radio->pGstreamer_s->pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
+	if (gst_element_set_state(radio->pGstreamer_s->pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
 		debug_error("Fail to change pipeline state");
-		gst_object_unref (radio->pGstreamer_s->pipeline);
-		g_free (radio->pGstreamer_s);
+		gst_object_unref(radio->pGstreamer_s->pipeline);
+		g_free(radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	}
 
-	ret_state = gst_element_get_state (radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
+	ret_state = gst_element_get_state(radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
 	if (ret_state == GST_STATE_CHANGE_FAILURE) {
 		debug_error("GST_STATE_CHANGE_FAILURE");
-		gst_object_unref (radio->pGstreamer_s->pipeline);
-		g_free (radio->pGstreamer_s);
+		gst_object_unref(radio->pGstreamer_s->pipeline);
+		g_free(radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	} else {
 		debug_log("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
@@ -784,24 +776,24 @@ _mmradio_start_pipeline(mm_radio_t* radio)
 }
 
 int
-_mmradio_stop_pipeline(mm_radio_t* radio)
+_mmradio_stop_pipeline(mm_radio_t *radio)
 {
 	int ret = MM_ERROR_NONE;
 	GstStateChangeReturn ret_state;
 
 	debug_log("\n");
-	if(gst_element_set_state (radio->pGstreamer_s->pipeline, GST_STATE_READY) == GST_STATE_CHANGE_FAILURE) {
+	if (gst_element_set_state(radio->pGstreamer_s->pipeline, GST_STATE_READY) == GST_STATE_CHANGE_FAILURE) {
 		debug_error("Fail to change pipeline state");
-		gst_object_unref (radio->pGstreamer_s->pipeline);
-		g_free (radio->pGstreamer_s);
+		gst_object_unref(radio->pGstreamer_s->pipeline);
+		g_free(radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	}
 
-	ret_state = gst_element_get_state (radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
+	ret_state = gst_element_get_state(radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
 	if (ret_state == GST_STATE_CHANGE_FAILURE) {
 		debug_error("GST_STATE_CHANGE_FAILURE");
-		gst_object_unref (radio->pGstreamer_s->pipeline);
-		g_free (radio->pGstreamer_s);
+		gst_object_unref(radio->pGstreamer_s->pipeline);
+		g_free(radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	} else {
 		debug_log("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
@@ -810,55 +802,54 @@ _mmradio_stop_pipeline(mm_radio_t* radio)
 }
 
 int
-_mmradio_destroy_pipeline(mm_radio_t * radio)
+_mmradio_destroy_pipeline(mm_radio_t *radio)
 {
 	int ret = 0;
 	GstStateChangeReturn ret_state;
 	debug_log("\n");
 
-	if(gst_element_set_state (radio->pGstreamer_s->pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
+	if (gst_element_set_state(radio->pGstreamer_s->pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
 		debug_error("Fail to change pipeline state");
-		gst_object_unref (radio->pGstreamer_s->pipeline);
-		g_free (radio->pGstreamer_s);
+		gst_object_unref(radio->pGstreamer_s->pipeline);
+		g_free(radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	}
 
-	ret_state = gst_element_get_state (radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
+	ret_state = gst_element_get_state(radio->pGstreamer_s->pipeline, NULL, NULL, GST_CLOCK_TIME_NONE);
 	if (ret_state == GST_STATE_CHANGE_FAILURE) {
 		debug_error("GST_STATE_CHANGE_FAILURE");
-		gst_object_unref (radio->pGstreamer_s->pipeline);
-		g_free (radio->pGstreamer_s);
+		gst_object_unref(radio->pGstreamer_s->pipeline);
+		g_free(radio->pGstreamer_s);
 		return MM_ERROR_RADIO_INVALID_STATE;
 	} else {
 		debug_log("[%s][%05d] GST_STATE_NULL ret_state = %d (GST_STATE_CHANGE_SUCCESS)\n", __func__, __LINE__, ret_state);
 	}
-	gst_object_unref (radio->pGstreamer_s->pipeline);
-	g_free (radio->pGstreamer_s);
+	gst_object_unref(radio->pGstreamer_s->pipeline);
+	g_free(radio->pGstreamer_s);
 	return ret;
 }
 #endif
 
 int
-_mmradio_seek(mm_radio_t* radio, MMRadioSeekDirectionType direction)
+_mmradio_seek(mm_radio_t *radio, MMRadioSeekDirectionType direction)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_SEEK );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_SEEK);
 
- 	int ret = 0;
+	int ret = 0;
 
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+	if (_mmradio_mute(radio) != MM_ERROR_NONE)
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 
 	MMRADIO_SLOG_DEBUG("trying to seek. direction[0:UP/1:DOWN) %d\n", direction);
 	radio->seek_direction = direction;
 
 	ret = pthread_create(&radio->seek_thread, NULL,
-		(void *)__mmradio_seek_thread, (void *)radio);
+	                     (void *)__mmradio_seek_thread, (void *)radio);
 
-	if ( ret )
-	{
+	if (ret) {
 		MMRADIO_LOG_DEBUG("failed create thread\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
@@ -869,27 +860,26 @@ _mmradio_seek(mm_radio_t* radio, MMRadioSeekDirectionType direction)
 }
 
 int
-_mmradio_start_scan(mm_radio_t* radio)
+_mmradio_start_scan(mm_radio_t *radio)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_START_SCAN );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_START_SCAN);
 
 	int scan_tr_id = 0;
 
 	radio->stop_scan = false;
 
 	scan_tr_id = pthread_create(&radio->scan_thread, NULL,
-		(void *)__mmradio_scan_thread, (void *)radio);
+	                            (void *)__mmradio_scan_thread, (void *)radio);
 
-	if (scan_tr_id != 0)
-	{
+	if (scan_tr_id != 0) {
 		MMRADIO_LOG_DEBUG("failed to create thread : scan\n");
 		return MM_ERROR_RADIO_NOT_INITIALIZED;
 	}
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_SCANNING );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_SCANNING);
 
 	MMRADIO_LOG_FLEAVE();
 
@@ -897,23 +887,22 @@ _mmradio_start_scan(mm_radio_t* radio)
 }
 
 int
-_mmradio_stop_scan(mm_radio_t* radio)
+_mmradio_stop_scan(mm_radio_t *radio)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_STOP_SCAN );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_STOP_SCAN);
 
 	radio->stop_scan = true;
 
- 	if( radio->scan_thread > 0 )
-	{
+	if (radio->scan_thread > 0) {
 		pthread_cancel(radio->scan_thread);
 		pthread_join(radio->scan_thread, NULL);
-	 	radio->scan_thread = 0;
+		radio->scan_thread = 0;
 	}
 
- 	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_READY );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_READY);
 	MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SCAN_STOP, NULL);
 
 	MMRADIO_LOG_FLEAVE();
@@ -922,32 +911,30 @@ _mmradio_stop_scan(mm_radio_t* radio)
 }
 
 int
-_mm_radio_get_signal_strength(mm_radio_t* radio, int *value)
+_mm_radio_get_signal_strength(mm_radio_t *radio, int *value)
 {
 	MMRADIO_LOG_FENTER();
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
-	return_val_if_fail( value, MM_ERROR_INVALID_ARGUMENT );
+	return_val_if_fail(value, MM_ERROR_INVALID_ARGUMENT);
 
 	/* just return stored frequency if radio device is not ready */
-	if ( radio->radio_fd < 0 )
-	{
+	if (radio->radio_fd < 0) {
 		MMRADIO_SLOG_DEBUG("Device not ready so sending 0\n");
 		*value = 0;
 		return MM_ERROR_NONE;
 	}
-	if (ioctl(radio->radio_fd, VIDIOC_G_TUNER, &(radio->vt)) < 0)
-	{
+	if (ioctl(radio->radio_fd, VIDIOC_G_TUNER, &(radio->vt)) < 0) {
 		debug_error("ioctl VIDIOC_G_TUNER error\n");
 		return MM_ERROR_RADIO_INTERNAL;
 	}
-        *value = radio->vt.signal;
+	*value = radio->vt.signal;
 	MMRADIO_LOG_FLEAVE();
 	return MM_ERROR_NONE;
 }
 
 void
-__mmradio_scan_thread(mm_radio_t* radio)
+__mmradio_scan_thread(mm_radio_t *radio)
 {
 	int ret = 0;
 	int prev_freq = 0;
@@ -959,39 +946,33 @@ __mmradio_scan_thread(mm_radio_t* radio)
 	vs.wrap_around = 0; /* around:1 not around:0 */
 	vs.seek_upward = 1; /* up : 1	------- down : 0 */
 
+	TTRACE_ASYNCBEGIN("MMRADIO:SCAN_THREAD", radio->radio_fd);
 	MMRADIO_LOG_FENTER();
-	MMRADIO_CHECK_INSTANCE( radio );
-	if( _mmradio_mute(radio) != MM_ERROR_NONE)
+	MMRADIO_CHECK_INSTANCE(radio);
+	if (_mmradio_mute(radio) != MM_ERROR_NONE)
 		goto FINISHED;
 
-	if( _mmradio_set_frequency(radio, radio->region_setting.band_min) != MM_ERROR_NONE)
+	if (_mmradio_set_frequency(radio, radio->region_setting.band_min) != MM_ERROR_NONE)
 		goto FINISHED;
 
 	MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SCAN_START, NULL);
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_SCANNING );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_SCANNING);
 
-	while( ! radio->stop_scan )
-	{
+	while (!radio->stop_scan) {
 		int freq = 0;
 		MMMessageParamType param = {0,};
 
 		MMRADIO_LOG_DEBUG("scanning....\n");
 		ret = ioctl(radio->radio_fd, VIDIOC_S_HW_FREQ_SEEK, &vs);
 
-		if( ret == -1 )
-		{
-			if ( errno == EAGAIN )
-			{
+		if (ret == -1) {
+			if (errno == EAGAIN) {
 				MMRADIO_LOG_ERROR("scanning timeout\n");
 				continue;
-			}
-			else if ( errno == EINVAL )
-			{
+			} else if (errno == EINVAL) {
 				MMRADIO_LOG_ERROR("The tuner index is out of bounds or the value in the type field is wrong.");
 				break;
-			}
-			else
-			{
+			} else {
 				MMRADIO_LOG_ERROR("Error: %s, %d\n", strerror_r(errno, str_error, sizeof(str_error)), errno);
 				break;
 			}
@@ -999,35 +980,30 @@ __mmradio_scan_thread(mm_radio_t* radio)
 
 		/* now we can get new frequency from radio device */
 
-		if ( radio->stop_scan ) break;
+		if (radio->stop_scan) break;
 
 		ret = _mmradio_get_frequency(radio, &freq);
-		if ( ret )
-		{
+		if (ret) {
 			MMRADIO_LOG_ERROR("failed to get current frequency\n");
-		}
-		else
-		{
-			if ( freq < prev_freq )
-			{
+		} else {
+			if (freq < prev_freq) {
 				MMRADIO_LOG_DEBUG("scanning wrapped around. stopping scan\n");
 				break;
 			}
 
-			if ( freq == prev_freq)
+			if (freq == prev_freq)
 				continue;
 
 			prev_freq = param.radio_scan.frequency = freq;
 			MMRADIO_SLOG_DEBUG("scanning : new frequency : [%d]\n", param.radio_scan.frequency);
 
 			/* drop if max freq is scanned */
-			if (param.radio_scan.frequency == radio->region_setting.band_max )
-			{
+			if (param.radio_scan.frequency == radio->region_setting.band_max) {
 				MMRADIO_LOG_DEBUG("%d freq is dropping...and stopping scan\n", param.radio_scan.frequency);
 				break;
 			}
 
-			if ( radio->stop_scan ) break; // doesn't need to post
+			if (radio->stop_scan) break;   /* doesn't need to post */
 
 			MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SCAN_INFO, &param);
 		}
@@ -1035,12 +1011,12 @@ __mmradio_scan_thread(mm_radio_t* radio)
 FINISHED:
 	radio->scan_thread = 0;
 
-	MMRADIO_SET_STATE( radio, MM_RADIO_STATE_READY );
+	MMRADIO_SET_STATE(radio, MM_RADIO_STATE_READY);
 
-	if ( ! radio->stop_scan )
-	{
+	if (!radio->stop_scan) {
 		MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SCAN_FINISH, NULL);
 	}
+	TTRACE_ASYNCEND("MMRADIO:SCAN_THREAD", radio->radio_fd);
 
 	MMRADIO_LOG_FLEAVE();
 
@@ -1050,13 +1026,13 @@ FINISHED:
 }
 
 bool
-__is_tunable_frequency(mm_radio_t* radio, int freq)
+__is_tunable_frequency(mm_radio_t *radio, int freq)
 {
 	MMRADIO_LOG_FENTER();
 
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
-	if ( freq == radio->region_setting.band_max|| freq == radio->region_setting.band_min )
+	if (freq == radio->region_setting.band_max || freq == radio->region_setting.band_min)
 		return false;
 
 	MMRADIO_LOG_FLEAVE();
@@ -1065,7 +1041,7 @@ __is_tunable_frequency(mm_radio_t* radio, int freq)
 }
 
 void
-__mmradio_seek_thread(mm_radio_t* radio)
+__mmradio_seek_thread(mm_radio_t *radio)
 {
 	int ret = 0;
 	int freq = 0;
@@ -1078,12 +1054,12 @@ __mmradio_seek_thread(mm_radio_t* radio)
 	vs.type = V4L2_TUNER_RADIO;
 	vs.wrap_around = DEFAULT_WRAP_AROUND;
 
+	TTRACE_ASYNCBEGIN("MMRADIO:SEEK_THREAD", radio->radio_fd);
 	MMRADIO_LOG_FENTER();
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
 	/* check direction */
-	switch( radio->seek_direction )
-	{
+	switch (radio->seek_direction) {
 		case MM_RADIO_SEEK_UP:
 			vs.seek_upward = 1;
 			break;
@@ -1096,25 +1072,18 @@ __mmradio_seek_thread(mm_radio_t* radio)
 
 	MMRADIO_LOG_DEBUG("seeking....\n");
 
-	while (  ! seek_stop )
-	{
-		ret = ioctl( radio->radio_fd, VIDIOC_S_HW_FREQ_SEEK, &vs );
+	while (!seek_stop) {
+		ret = ioctl(radio->radio_fd, VIDIOC_S_HW_FREQ_SEEK, &vs);
 
-		if( ret == -1 )
-		{
-			if ( errno == EAGAIN )
-			{
+		if (ret == -1) {
+			if (errno == EAGAIN) {
 				/* FIXIT : we need retrying code here */
 				MMRADIO_LOG_ERROR("scanning timeout\n");
 				goto SEEK_FAILED;
-			}
-			else if ( errno == EINVAL )
-			{
+			} else if (errno == EINVAL) {
 				MMRADIO_LOG_ERROR("The tuner index is out of bounds or the value in the type field is wrong.");
 				goto SEEK_FAILED;
-			}
-			else
-			{
+			} else {
 				MMRADIO_LOG_ERROR("Error: %s, %d\n", strerror_r(errno, str_error, sizeof(str_error)), errno);
 				goto SEEK_FAILED;
 			}
@@ -1122,8 +1091,7 @@ __mmradio_seek_thread(mm_radio_t* radio)
 
 		/* now we can get new frequency from radio device */
 		ret = _mmradio_get_frequency(radio, &freq);
-		if ( ret )
-		{
+		if (ret) {
 			MMRADIO_LOG_ERROR("failed to get current frequency\n");
 			goto SEEK_FAILED;
 		}
@@ -1131,18 +1099,15 @@ __mmradio_seek_thread(mm_radio_t* radio)
 		MMRADIO_LOG_DEBUG("found frequency\n");
 
 		/* if same freq is found, ignore it and search next one. */
-		if ( freq == radio->prev_seek_freq )
-		{
+		if (freq == radio->prev_seek_freq) {
 			MMRADIO_LOG_DEBUG("It's same with previous found one. So, trying next one. \n");
 			continue;
 		}
 
-		if ( __is_tunable_frequency(radio, freq) ) // check if it's limit freq or not
-		{
+		if (__is_tunable_frequency(radio, freq)) { /* check if it's limit freq or not */
 			/* now tune to new frequency */
 			ret = _mmradio_set_frequency(radio, freq);
-			if ( ret )
-			{
+			if (ret) {
 				MMRADIO_LOG_ERROR("failed to tune to new frequency\n");
 				goto SEEK_FAILED;
 			}
@@ -1153,8 +1118,7 @@ __mmradio_seek_thread(mm_radio_t* radio)
 		  * Otherwise, sound can't output even though application set new frequency.
 		  */
 		ret = _mmradio_unmute(radio);
-		if ( ret )
-		{
+		if (ret) {
 			MMRADIO_LOG_ERROR("failed to tune to new frequency\n");
 			goto SEEK_FAILED;
 		}
@@ -1166,7 +1130,7 @@ __mmradio_seek_thread(mm_radio_t* radio)
 	}
 
 	radio->seek_thread = 0;
-
+	TTRACE_ASYNCEND("MMRADIO:SEEK_THREAD", radio->radio_fd);
 	MMRADIO_LOG_FLEAVE();
 
 	pthread_exit(NULL);
@@ -1177,18 +1141,18 @@ SEEK_FAILED:
 	param.radio_scan.frequency = -1;
 	MMRADIO_POST_MSG(radio, MM_MESSAGE_RADIO_SEEK_FINISH, &param);
 	pthread_exit(NULL);
+	TTRACE_ASYNCEND("MMRADIO:SEEK_THREAD", radio->radio_fd);
 	return;
 }
 
 static bool
-__mmradio_post_message(mm_radio_t* radio, enum MMMessageType msgtype, MMMessageParamType* param)
+__mmradio_post_message(mm_radio_t *radio, enum MMMessageType msgtype, MMMessageParamType *param)
 {
-	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
 	MMRADIO_LOG_FENTER();
 
-	if ( !radio->msg_cb )
-	{
+	if (!radio->msg_cb) {
 		debug_warning("failed to post a message\n");
 		return false;
 	}
@@ -1203,158 +1167,145 @@ __mmradio_post_message(mm_radio_t* radio, enum MMMessageType msgtype, MMMessageP
 }
 
 static int
- __mmradio_check_state(mm_radio_t* radio, MMRadioCommand command)
- {
-	 MMRadioStateType radio_state = MM_RADIO_STATE_NUM;
+__mmradio_check_state(mm_radio_t *radio, MMRadioCommand command)
+{
+	MMRadioStateType radio_state = MM_RADIO_STATE_NUM;
 
 	MMRADIO_LOG_FENTER();
 
- 	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
- 	radio_state = __mmradio_get_state( radio );
+	radio_state = __mmradio_get_state(radio);
 
- 	MMRADIO_LOG_DEBUG("incomming command : %d  current state : %d\n", command, radio_state);
+	MMRADIO_LOG_DEBUG("incomming command : %d  current state : %d\n", command, radio_state);
 
- 	switch( command )
- 	{
- 		case MMRADIO_COMMAND_CREATE:
- 		{
- 			if ( radio_state != 0 )
- 				goto NO_OP;
- 		}
- 		break;
+	switch (command) {
+		case MMRADIO_COMMAND_CREATE: {
+				if (radio_state != 0)
+					goto NO_OP;
+			}
+			break;
 
- 		case MMRADIO_COMMAND_REALIZE:
- 		{
-			if ( radio_state == MM_RADIO_STATE_READY ||
-					radio_state == MM_RADIO_STATE_PLAYING ||
-					radio_state == MM_RADIO_STATE_SCANNING )
-				goto NO_OP;
+		case MMRADIO_COMMAND_REALIZE: {
+				if (radio_state == MM_RADIO_STATE_READY ||
+				    radio_state == MM_RADIO_STATE_PLAYING ||
+				    radio_state == MM_RADIO_STATE_SCANNING)
+					goto NO_OP;
 
-			if ( radio_state == 0 )
-				goto INVALID_STATE;
- 		}
- 		break;
+				if (radio_state == 0)
+					goto INVALID_STATE;
+			}
+			break;
 
- 		case MMRADIO_COMMAND_UNREALIZE:
- 		{
-			if ( radio_state == MM_RADIO_STATE_NULL )
-				goto NO_OP;
+		case MMRADIO_COMMAND_UNREALIZE: {
+				if (radio_state == MM_RADIO_STATE_NULL)
+					goto NO_OP;
 
-			/* we can call unrealize at any higher state */
- 		}
- 		break;
+				/* we can call unrealize at any higher state */
+			}
+			break;
 
- 		case MMRADIO_COMMAND_START:
- 		{
- 			if ( radio_state == MM_RADIO_STATE_PLAYING )
- 				goto NO_OP;
+		case MMRADIO_COMMAND_START: {
+				if (radio_state == MM_RADIO_STATE_PLAYING)
+					goto NO_OP;
 
- 			if ( radio_state != MM_RADIO_STATE_READY )
- 				goto INVALID_STATE;
- 		}
- 		break;
+				if (radio_state != MM_RADIO_STATE_READY)
+					goto INVALID_STATE;
+			}
+			break;
 
- 		case MMRADIO_COMMAND_STOP:
- 		{
- 			if ( radio_state == MM_RADIO_STATE_READY )
- 				goto NO_OP;
+		case MMRADIO_COMMAND_STOP: {
+				if (radio_state == MM_RADIO_STATE_READY)
+					goto NO_OP;
 
- 			if ( radio_state != MM_RADIO_STATE_PLAYING )
- 				goto INVALID_STATE;
- 		}
- 		break;
+				if (radio_state != MM_RADIO_STATE_PLAYING)
+					goto INVALID_STATE;
+			}
+			break;
 
- 		case MMRADIO_COMMAND_START_SCAN:
- 		{
- 			if ( radio_state == MM_RADIO_STATE_SCANNING )
- 				goto NO_OP;
+		case MMRADIO_COMMAND_START_SCAN: {
+				if (radio_state == MM_RADIO_STATE_SCANNING)
+					goto NO_OP;
 
- 			if ( radio_state != MM_RADIO_STATE_READY )
- 				goto INVALID_STATE;
- 		}
- 		break;
+				if (radio_state != MM_RADIO_STATE_READY)
+					goto INVALID_STATE;
+			}
+			break;
 
- 		case MMRADIO_COMMAND_STOP_SCAN:
- 		{
- 			if ( radio_state == MM_RADIO_STATE_READY )
- 				goto NO_OP;
+		case MMRADIO_COMMAND_STOP_SCAN: {
+				if (radio_state == MM_RADIO_STATE_READY)
+					goto NO_OP;
 
- 			if ( radio_state != MM_RADIO_STATE_SCANNING )
- 				goto INVALID_STATE;
- 		}
- 		break;
+				if (radio_state != MM_RADIO_STATE_SCANNING)
+					goto INVALID_STATE;
+			}
+			break;
 
- 		case MMRADIO_COMMAND_DESTROY:
- 		case MMRADIO_COMMAND_MUTE:
- 		case MMRADIO_COMMAND_UNMUTE:
- 		case MMRADIO_COMMAND_SET_FREQ:
- 		case MMRADIO_COMMAND_GET_FREQ:
-		case MMRADIO_COMMAND_SET_REGION:
- 		{
-			/* we can do it at any state */
- 		}
- 		break;
+		case MMRADIO_COMMAND_DESTROY:
+		case MMRADIO_COMMAND_MUTE:
+		case MMRADIO_COMMAND_UNMUTE:
+		case MMRADIO_COMMAND_SET_FREQ:
+		case MMRADIO_COMMAND_GET_FREQ:
+		case MMRADIO_COMMAND_SET_REGION: {
+				/* we can do it at any state */
+			}
+			break;
 
- 		case MMRADIO_COMMAND_SEEK:
- 		{
-			if ( radio_state != MM_RADIO_STATE_PLAYING )
-				goto INVALID_STATE;
- 		}
- 		break;
+		case MMRADIO_COMMAND_SEEK: {
+				if (radio_state != MM_RADIO_STATE_PLAYING)
+					goto INVALID_STATE;
+			}
+			break;
 
-		case MMRADIO_COMMAND_GET_REGION:
-		{
-			if ( radio_state == MM_RADIO_STATE_NULL )
-				goto INVALID_STATE;
-		}
-		break;
+		case MMRADIO_COMMAND_GET_REGION: {
+				if (radio_state == MM_RADIO_STATE_NULL)
+					goto INVALID_STATE;
+			}
+			break;
 
- 		default:
- 			MMRADIO_LOG_DEBUG("not handled in FSM. don't care it\n");
- 		break;
- 	}
+		default:
+			MMRADIO_LOG_DEBUG("not handled in FSM. don't care it\n");
+			break;
+	}
 
- 	MMRADIO_LOG_DEBUG("status OK\n");
+	MMRADIO_LOG_DEBUG("status OK\n");
 
- 	radio->cmd = command;
+	radio->cmd = command;
 
 	MMRADIO_LOG_FLEAVE();
 
- 	return MM_ERROR_NONE;
+	return MM_ERROR_NONE;
 
 
- INVALID_STATE:
- 	debug_warning("invalid state. current : %d  command : %d\n",
- 			radio_state, command);
+INVALID_STATE:
+	debug_warning("invalid state. current : %d  command : %d\n",
+	              radio_state, command);
 	MMRADIO_LOG_FLEAVE();
- 	return MM_ERROR_RADIO_INVALID_STATE;
+	return MM_ERROR_RADIO_INVALID_STATE;
 
 
- NO_OP:
- 	debug_warning("mm-radio is in the desired state(%d). doing noting\n", radio_state);
+NO_OP:
+	debug_warning("mm-radio is in the desired state(%d). doing noting\n", radio_state);
 	MMRADIO_LOG_FLEAVE();
- 	return MM_ERROR_RADIO_NO_OP;
+	return MM_ERROR_RADIO_NO_OP;
 
- }
+}
 
 static bool
-__mmradio_set_state(mm_radio_t* radio, int new_state)
+__mmradio_set_state(mm_radio_t *radio, int new_state)
 {
 	MMMessageParamType msg = {0, };
 	int msg_type = MM_MESSAGE_UNKNOWN;
 
 	MMRADIO_LOG_FENTER();
- 	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
-	if ( ! radio )
-	{
+	if (!radio) {
 		debug_warning("calling set_state with invalid radio handle\n");
 		return false;
 	}
 
-	if ( radio->current_state == new_state && radio->pending_state == 0 )
-	{
+	if (radio->current_state == new_state && radio->pending_state == 0) {
 		debug_warning("we are in same state\n");
 		return true;
 	}
@@ -1368,27 +1319,24 @@ __mmradio_set_state(mm_radio_t* radio, int new_state)
 	msg.state.current = radio->current_state;
 
 	/* post message to application */
-	switch( radio->sm.by_asm_cb )
-	{
-		case MMRADIO_ASM_CB_NONE:
-		{
-			msg_type = MM_MESSAGE_STATE_CHANGED;
-			MMRADIO_POST_MSG( radio, msg_type, &msg );
-		}
-		break;
+	switch (radio->sm.by_asm_cb) {
+		case MMRADIO_ASM_CB_NONE: {
+				msg_type = MM_MESSAGE_STATE_CHANGED;
+				MMRADIO_POST_MSG(radio, msg_type, &msg);
+			}
+			break;
 
-		case MMRADIO_ASM_CB_POSTMSG:
-		{
-			msg_type = MM_MESSAGE_STATE_INTERRUPTED;
-			msg.union_type = MM_MSG_UNION_CODE;
-			msg.code = radio->sm.event_src;
-			MMRADIO_POST_MSG( radio, msg_type, &msg );
-		}
-		break;
+		case MMRADIO_ASM_CB_POSTMSG: {
+				msg_type = MM_MESSAGE_STATE_INTERRUPTED;
+				msg.union_type = MM_MSG_UNION_CODE;
+				msg.code = radio->sm.event_src;
+				MMRADIO_POST_MSG(radio, msg_type, &msg);
+			}
+			break;
 
 		case MMRADIO_ASM_CB_SKIP_POSTMSG:
 		default:
-		break;
+			break;
 	}
 
 	MMRADIO_LOG_FLEAVE();
@@ -1397,20 +1345,20 @@ __mmradio_set_state(mm_radio_t* radio, int new_state)
 }
 
 static int
-__mmradio_get_state(mm_radio_t* radio)
+__mmradio_get_state(mm_radio_t *radio)
 {
- 	MMRADIO_CHECK_INSTANCE( radio );
+	MMRADIO_CHECK_INSTANCE(radio);
 
 	MMRADIO_LOG_DEBUG("radio state : current : [%d]   old : [%d]   pending : [%d]\n",
-			radio->current_state, radio->old_state, radio->pending_state );
+	                  radio->current_state, radio->old_state, radio->pending_state);
 
 	return radio->current_state;
 }
-
+#ifdef FEATURE_ASM_SUPPORT
 ASM_cb_result_t
-__mmradio_asm_callback(int handle, ASM_event_sources_t event_source, ASM_sound_commands_t command, unsigned int sound_status, void* cb_data)
+__mmradio_asm_callback(int handle, ASM_event_sources_t event_source, ASM_sound_commands_t command, unsigned int sound_status, void *cb_data)
 {
-	mm_radio_t* radio = (mm_radio_t*) cb_data;
+	mm_radio_t *radio = (mm_radio_t *) cb_data;
 	int result = MM_ERROR_NONE;
 	ASM_cb_result_t	cb_res = ASM_CB_RES_NONE;
 
@@ -1418,77 +1366,161 @@ __mmradio_asm_callback(int handle, ASM_event_sources_t event_source, ASM_sound_c
 
 	radio->sm.event_src = event_source;
 
-	switch(command)
-	{
+	switch (command) {
 		case ASM_COMMAND_STOP:
-		case ASM_COMMAND_PAUSE:
-		{
-			MMRADIO_LOG_DEBUG("ASM asked me to stop. cmd : %d\n", command);
-			switch(event_source)
-			{
-				case ASM_EVENT_SOURCE_CALL_START:
-				case ASM_EVENT_SOURCE_ALARM_START:
-				case ASM_EVENT_SOURCE_EARJACK_UNPLUG:
-				case ASM_EVENT_SOURCE_MEDIA:
-				{
-					radio->sm.by_asm_cb = MMRADIO_ASM_CB_POSTMSG;
-					result = _mmradio_stop(radio);
-					if( result )
-					{
-						MMRADIO_LOG_ERROR("failed to stop radio\n");
-					}
+		case ASM_COMMAND_PAUSE: {
+				MMRADIO_LOG_DEBUG("ASM asked me to stop. cmd : %d\n", command);
+				switch (event_source) {
+					case ASM_EVENT_SOURCE_CALL_START:
+					case ASM_EVENT_SOURCE_ALARM_START:
+					case ASM_EVENT_SOURCE_EARJACK_UNPLUG:
+					case ASM_EVENT_SOURCE_MEDIA: {
+							radio->sm.by_asm_cb = MMRADIO_ASM_CB_POSTMSG;
+							result = _mmradio_stop(radio);
+							if (result) {
+								MMRADIO_LOG_ERROR("failed to stop radio\n");
+							}
 
-					MMRADIO_LOG_DEBUG("skip unrealize in asm callback");
-				}
-				break;
+							MMRADIO_LOG_DEBUG("skip unrealize in asm callback");
+						}
+						break;
 
-				case ASM_EVENT_SOURCE_RESOURCE_CONFLICT:
-				default:
-				{
-					radio->sm.by_asm_cb = MMRADIO_ASM_CB_POSTMSG;
-					result = _mmradio_stop(radio);
-					if( result )
-					{
-						MMRADIO_LOG_ERROR("failed to stop radio\n");
-					}
+					case ASM_EVENT_SOURCE_RESOURCE_CONFLICT:
+					default: {
+							radio->sm.by_asm_cb = MMRADIO_ASM_CB_POSTMSG;
+							result = _mmradio_stop(radio);
+							if (result) {
+								MMRADIO_LOG_ERROR("failed to stop radio\n");
+							}
+						}
+						break;
 				}
-				break;
+				cb_res = ASM_CB_RES_STOP;
 			}
-			cb_res = ASM_CB_RES_STOP;
-		}
-		break;
+			break;
 
 		case ASM_COMMAND_PLAY:
-		case ASM_COMMAND_RESUME:
-		{
-			MMMessageParamType msg = {0,};
-			msg.union_type = MM_MSG_UNION_CODE;
-			msg.code = event_source;
+		case ASM_COMMAND_RESUME: {
+				MMMessageParamType msg = {0,};
+				msg.union_type = MM_MSG_UNION_CODE;
+				msg.code = event_source;
 
-			MMRADIO_LOG_DEBUG("Got ASM resume message by %d\n", msg.code);
-			MMRADIO_POST_MSG(radio, MM_MESSAGE_READY_TO_RESUME, &msg);
+				MMRADIO_LOG_DEBUG("Got ASM resume message by %d\n", msg.code);
+				MMRADIO_POST_MSG(radio, MM_MESSAGE_READY_TO_RESUME, &msg);
 
-			cb_res = ASM_CB_RES_IGNORE;
-			radio->sm.by_asm_cb = MMRADIO_ASM_CB_NONE;
-		}
-		break;
+				cb_res = ASM_CB_RES_IGNORE;
+				radio->sm.by_asm_cb = MMRADIO_ASM_CB_NONE;
+			}
+			break;
 
 		default:
-		break;
+			break;
 	}
 
 	MMRADIO_LOG_FLEAVE();
 
 	return cb_res;
 }
+#else
+void _mmradio_sound_focus_cb(int id, mm_sound_focus_type_e focus_type,
+                             mm_sound_focus_state_e focus_state, const char *reason_for_change,
+                             const char *additional_info, void *user_data)
+{
+	mm_radio_t *radio = (mm_radio_t *) user_data;
+	ASM_event_sources_t event_source;
+	int result = MM_ERROR_NONE;
+	int postMsg = false;
 
-int _mmradio_get_region_type(mm_radio_t*radio, MMRadioRegionType *type)
+	MMRADIO_LOG_FENTER();
+	MMRADIO_CHECK_INSTANCE(radio);
+
+	mmradio_get_audio_focus_reason(focus_state, reason_for_change, &event_source, &postMsg);
+	radio->sm.event_src = event_source;
+
+	switch (focus_state) {
+		case FOCUS_IS_RELEASED:
+			radio->sm.by_asm_cb = MMRADIO_ASM_CB_POSTMSG;
+			result = _mmradio_stop(radio);
+			if (result) {
+				MMRADIO_LOG_ERROR("failed to stop radio\n");
+			}
+			MMRADIO_LOG_DEBUG("FOCUS_IS_RELEASED\n");
+			break;
+
+		case FOCUS_IS_ACQUIRED: {
+				MMMessageParamType msg = {0,};
+				msg.union_type = MM_MSG_UNION_CODE;
+				msg.code = event_source;
+				if (postMsg)
+					MMRADIO_POST_MSG(radio, MM_MESSAGE_READY_TO_RESUME, &msg);
+
+				radio->sm.by_asm_cb = MMRADIO_ASM_CB_NONE;
+
+				MMRADIO_LOG_DEBUG("FOCUS_IS_ACQUIRED\n");
+			}
+			break;
+
+		default:
+			MMRADIO_LOG_DEBUG("Unknown focus_state\n");
+			break;
+	}
+	MMRADIO_LOG_FLEAVE();
+}
+
+void _mmradio_sound_focus_watch_cb(int id, mm_sound_focus_type_e focus_type, mm_sound_focus_state_e focus_state,
+                                   const char *reason_for_change, const char *additional_info, void *user_data)
+{
+	mm_radio_t *radio = (mm_radio_t *) user_data;
+	ASM_event_sources_t event_source;
+	int result = MM_ERROR_NONE;
+	int postMsg = false;
+
+	MMRADIO_LOG_FENTER();
+	MMRADIO_CHECK_INSTANCE(radio);
+
+	mmradio_get_audio_focus_reason(!focus_state, reason_for_change, &event_source, &postMsg);
+	radio->sm.event_src = event_source;
+
+	switch (focus_state) {
+		case FOCUS_IS_RELEASED: {
+				MMMessageParamType msg = {0,};
+				msg.union_type = MM_MSG_UNION_CODE;
+				msg.code = event_source;
+				if (postMsg)
+					MMRADIO_POST_MSG(radio, MM_MESSAGE_READY_TO_RESUME, &msg);
+
+				radio->sm.by_asm_cb = MMRADIO_ASM_CB_NONE;
+
+				MMRADIO_LOG_DEBUG("FOCUS_IS_ACQUIRED postMsg: %d\n", postMsg);
+			}
+			break;
+
+		case FOCUS_IS_ACQUIRED: {
+				radio->sm.by_asm_cb = MMRADIO_ASM_CB_POSTMSG;
+				result = _mmradio_stop(radio);
+				if (result) {
+					MMRADIO_LOG_ERROR("failed to stop radio\n");
+				}
+				MMRADIO_LOG_DEBUG("FOCUS_IS_RELEASED\n");
+				break;
+			}
+			break;
+
+		default:
+			MMRADIO_LOG_DEBUG("Unknown focus_state postMsg : %d\n", postMsg);
+			break;
+	}
+	MMRADIO_LOG_FLEAVE();
+}
+#endif
+
+int _mmradio_get_region_type(mm_radio_t *radio, MMRadioRegionType *type)
 {
 	MMRADIO_LOG_FENTER();
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_GET_REGION );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_GET_REGION);
 
-	return_val_if_fail( type, MM_ERROR_INVALID_ARGUMENT );
+	return_val_if_fail(type, MM_ERROR_INVALID_ARGUMENT);
 
 	*type = radio->region_setting.country;
 
@@ -1496,13 +1528,13 @@ int _mmradio_get_region_type(mm_radio_t*radio, MMRadioRegionType *type)
 	return MM_ERROR_NONE;
 }
 
-int _mmradio_get_region_frequency_range(mm_radio_t* radio, unsigned int *min_freq, unsigned int *max_freq)
+int _mmradio_get_region_frequency_range(mm_radio_t *radio, unsigned int *min_freq, unsigned int *max_freq)
 {
 	MMRADIO_LOG_FENTER();
-	MMRADIO_CHECK_INSTANCE( radio );
-	MMRADIO_CHECK_STATE_RETURN_IF_FAIL( radio, MMRADIO_COMMAND_GET_REGION );
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_GET_REGION);
 
-	return_val_if_fail( min_freq && max_freq, MM_ERROR_INVALID_ARGUMENT );
+	return_val_if_fail(min_freq && max_freq, MM_ERROR_INVALID_ARGUMENT);
 
 	*min_freq = radio->region_setting.band_min;
 	*max_freq = radio->region_setting.band_max;
@@ -1510,3 +1542,19 @@ int _mmradio_get_region_frequency_range(mm_radio_t* radio, unsigned int *min_fre
 	MMRADIO_LOG_FLEAVE();
 	return MM_ERROR_NONE;
 }
+
+int _mmradio_get_channel_spacing(mm_radio_t *radio, unsigned int *ch_spacing)
+{
+	MMRADIO_LOG_FENTER();
+	MMRADIO_CHECK_INSTANCE(radio);
+	MMRADIO_CHECK_STATE_RETURN_IF_FAIL(radio, MMRADIO_COMMAND_GET_REGION);
+
+	return_val_if_fail(ch_spacing, MM_ERROR_INVALID_ARGUMENT);
+
+	*ch_spacing = radio->region_setting.channel_spacing;
+
+	MMRADIO_LOG_FLEAVE();
+	return MM_ERROR_NONE;
+}
+
+

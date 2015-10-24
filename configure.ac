@@ -9,6 +9,8 @@ AC_CONFIG_HEADER([config.h])
 
 # Checks for programs.
 AC_PROG_LIBTOOL
+m4_pattern_allow([AM_PROG_AR])
+AM_PROG_AR
 AC_PROG_CC
 
 # Checks for libraries.
@@ -36,11 +38,11 @@ PKG_CHECK_MODULES(MMCOMMON, mm-common)
 AC_SUBST(MMCOMMON_CFLAGS)
 AC_SUBST(MMCOMMON_LIBS)
 
-PKG_CHECK_MODULES(GST, gstreamer-0.10)
+PKG_CHECK_MODULES(GST, gstreamer-1.0)
 AC_SUBST(GST_CFLAGS)
 AC_SUBST(GST_LIBS)
 
-PKG_CHECK_MODULES(GSTAPP, gstreamer-app-0.10)
+PKG_CHECK_MODULES(GSTAPP, gstreamer-app-1.0)
 AC_SUBST(GSTAPP_CFLAGS)
 AC_SUBST(GSTAPP_LIBS)
 
@@ -56,6 +58,16 @@ PKG_CHECK_MODULES(MMSOUND, mm-sound)
 AC_SUBST(MMSOUND_CFLAGS)
 AC_SUBST(MMSOUND_LIBS)
 
+PKG_CHECK_MODULES(DBUS, dbus-1)
+AC_SUBST(DBUS_CFLAGS)
+AC_SUBST(DBUS_LIBS)
+
+PKG_CHECK_MODULES(INIPARSER, iniparser)
+AC_SUBST(INIPARSER_CFLAGS)
+AC_SUBST(INIPARSER_LIBS)
+
+PKG_CHECK_MODULES(TTRACE, [ttrace], AC_DEFINE(ENABLE_TTRACE, 1, [ttrace available]));
+
 AC_ARG_ENABLE(emulator, AC_HELP_STRING([--enable-emulator], [using emulator interface]),
 [
  case "${enableval}" in
@@ -65,6 +77,36 @@ AC_ARG_ENABLE(emulator, AC_HELP_STRING([--enable-emulator], [using emulator inte
  esac
  ],[ENABLE_EMULATOR=no])
 AM_CONDITIONAL(ENABLE_EMULATOR, test "x$ENABLE_EMULATOR" = "xyes")
+
+AC_ARG_ENABLE(broadcom, AC_HELP_STRING([--enable-broadcom], [using broadcom interface]),
+[
+ case "${enableval}" in
+         yes) ENABLE_BROADCOM=yes ;;
+         no)  ENABLE_BROADCOM=no ;;
+         *)   AC_MSG_ERROR(bad value ${enableval} for --enable-broadcom) ;;
+ esac
+ ],
+ [ENABLE_BROADCOM=no])
+AM_CONDITIONAL(ENABLE_BROADCOM, test "x$ENABLE_BROADCOM" = "xyes")
+
+AC_ARG_ENABLE(sprd, AC_HELP_STRING([--enable-sprd], [using sprd interface]),
+[
+ case "${enableval}" in
+         yes) ENABLE_SPRD=yes ;;
+         no)  ENABLE_SPRD=no ;;
+         *)   AC_MSG_ERROR(bad value ${enableval} for --enable-sprd) ;;
+ esac
+ ],
+ [ENABLE_SPRD=no])
+AM_CONDITIONAL(ENABLE_SPRD, test "x$ENABLE_SPRD" = "xyes")
+
+AC_ARG_WITH(
+        [udev-rules-dir],
+        AS_HELP_STRING([--with-udev-rules-dir],[Directory where to install udev rules to (defaults to /usr/lib/udev/rules.d)]),
+        [udevrulesdir=$withval], [udevrulesdir="/usr/lib/udev/rules.d"])
+
+AC_SUBST(udevrulesdir)
+
 
 AC_CONFIG_FILES([
 	Makefile
